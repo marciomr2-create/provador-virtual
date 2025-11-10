@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provador Digital.AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Dark Theme with Gold and Teal Accents */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Tailwind bg-gray-900 */
+            color: #fcd34d; /* Tailwind amber-300 */
+        }
+
+        /* Painel Style */
+        .panel {
+            background-color: #1f2937; /* Tailwind bg-gray-800 */
+            border-radius: 0.75rem; /* rounded-xl */
+            border: 1px solid #b45309; /* border-amber-700 */
+            padding: 1.5rem; /* p-6 */
+        }
+
+        /* Upload Area Style */
+        .upload-area {
+            border: 2px dashed #4b5563; /* border-dashed border-gray-600 */
+            border-radius: 0.5rem; /* rounded-lg */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 150px;
+            background-color: #374151; /* bg-gray-700 */
+            color: #d1d5db; /* text-gray-300 */
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .upload-area:hover {
+            background-color: #4b5563; /* bg-gray-600 */
+            border-color: #f59e0b; /* border-amber-500 */
+        }
+
+        /* Primary Button (Teal) */
+        .btn-primary {
+            background-color: #0d9488; /* bg-teal-600 */
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #0f766e; /* hover:bg-teal-700 */
+        }
+        .btn-primary:disabled {
+            background-color: #1f2937; /* bg-gray-800 */
+            color: #4b5563; /* text-gray-600 */
+            cursor: not-allowed;
+        }
+
+        /* Secondary Button (Gold Outline) */
+        .btn-secondary {
+            background-color: transparent;
+            color: #fcd34d; /* text-amber-300 */
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border: 1px solid #fcd34d; /* border-amber-300 */
+            border-radius: 0.5rem;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #fcd34d; /* bg-amber-300 */
+            color: #111827; /* text-gray-900 */
+        }
+        .btn-secondary:disabled {
+            background-color: transparent;
+            color: #4b5563; /* text-gray-600 */
+            border-color: #4b5563; /* border-gray-600 */
+            cursor: not-allowed;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>
