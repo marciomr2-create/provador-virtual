@@ -12,26 +12,43 @@ export const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-export const generateLook = async (person: string, top: string, bottom: string): Promise<string> => {
+export const generateLook = async (person: string, top: string | null, bottom: string | null): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-        // FIX: Changed model to 'gemini-2.5-flash-image' for image editing and generation. 'gemini-2.5-pro' is a text-only model.
-        model: 'gemini-2.5-flash-image',
-        contents: {
-            parts: [
-                { text: `Sua tarefa é criar uma imagem fotorrealista de "provador virtual". Use a imagem da pessoa fornecida como base principal. Seu objetivo é vestir perfeitamente essa pessoa com as peças de roupa superior e inferior fornecidas.
+    
+    let clothingPrompt = '';
+    if (top && bottom) {
+        clothingPrompt = 'com as peças de roupa superior e inferior fornecidas';
+    } else if (top) {
+        clothingPrompt = 'com a peça de roupa superior fornecida';
+    } else if (bottom) {
+        clothingPrompt = 'com a peça de roupa inferior fornecida';
+    } else {
+        throw new Error("At least one clothing item is required.");
+    }
+
+    const fullPrompt = `Sua tarefa é criar uma imagem fotorrealista de "provador virtual". Use a imagem da pessoa fornecida como base principal. Seu objetivo é vestir perfeitamente essa pessoa ${clothingPrompt}.
 
 Instruções para a imagem final:
-1.  **Aplicação das Roupas**: Aplique realisticamente as peças de roupa (superior e inferior) na pessoa, prestando muita atenção ao caimento natural, dobras do tecido, textura e iluminação para garantir que as roupas pareçam estar realmente sendo usadas.
+1.  **Aplicação das Roupas**: Aplique realisticamente a(s) peça(s) de roupa na pessoa, prestando muita atenção ao caimento natural, dobras do tecido, textura e iluminação para garantir que as roupas pareçam estar realmente sendo usadas. Se apenas uma peça for fornecida (superior ou inferior), imagine uma peça complementar que combine bem (por exemplo, se um top for fornecido, adicione uma calça jeans ou saia neutra; se uma calça for fornecida, adicione uma camiseta branca simples). A peça fornecida deve ser o foco principal.
 2.  **Preservação**: É crucial manter a pose original da pessoa, sua forma corporal, estrutura facial e cabelo. Não altere suas características físicas.
 3.  **Fundo**: Substitua o fundo original por um fundo limpo e neutro.
 4.  **Retoque de Pele**: Aplique um retoque de pele leve e sutil para remover pequenas imperfeições e reduzir o brilho excessivo, visando um resultado natural.
-5.  **Resultado**: O resultado final deve ser apenas a imagem gerada.` },
-                { inlineData: { mimeType: 'image/jpeg', data: person } },
-                { inlineData: { mimeType: 'image/jpeg', data: top } },
-                { inlineData: { mimeType: 'image/jpeg', data: bottom } },
-            ]
-        },
+5.  **Resultado**: O resultado final deve ser apenas a imagem gerada.`;
+
+    const parts: any[] = [
+        { text: fullPrompt },
+        { inlineData: { mimeType: 'image/jpeg', data: person } }
+    ];
+    if (top) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: top } });
+    }
+    if (bottom) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: bottom } });
+    }
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: { parts },
         config: {
             responseModalities: [Modality.IMAGE],
         }
@@ -42,7 +59,7 @@ Instruções para a imagem final:
             return part.inlineData.data;
         }
     }
-    throw new Error("No image generated from look creation.");
+    throw new Error("Nenhuma imagem gerada a partir da criação do look.");
 };
 
 export const editImageWithText = async (baseImage: string, prompt: string): Promise<string> => {
@@ -65,7 +82,7 @@ export const editImageWithText = async (baseImage: string, prompt: string): Prom
             return part.inlineData.data;
         }
     }
-    throw new Error("No image generated from editing.");
+    throw new Error("Nenhuma imagem gerada a partir da edição.");
 };
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string[]> => {
@@ -83,12 +100,14 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string[]>
     return response.generatedImages.map(img => img.image.imageBytes);
 };
 
-export const generateVideo = async (baseImage: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
+export const generateVideo = async (baseImage: string, aspectRatio: '16:9' | '9:16', prompt: string): Promise<string> => {
     // Re-create instance to use the latest key from the dialog
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const finalPrompt = prompt.trim() ? prompt : 'Um vídeo curto e cinematográfico desta cena, com movimento sutil e natural.';
+    
     let operation = await ai.models.generateVideos({
         model: 'veo-3.1-fast-generate-preview',
-        prompt: 'A short, cinematic video of this scene, with subtle, natural movement.',
+        prompt: finalPrompt,
         image: {
             imageBytes: baseImage,
             mimeType: 'image/jpeg',
@@ -106,17 +125,19 @@ export const generateVideo = async (baseImage: string, aspectRatio: '16:9' | '9:
     }
 
     if(operation.error) {
-        throw new Error(operation.error.message || 'Video generation failed.');
+        throw new Error(operation.error.message || 'A geração de vídeo falhou.');
     }
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) {
-        throw new Error("Video generation completed, but no download link was found.");
+        throw new Error("A geração do vídeo foi concluída, mas nenhum link para download foi encontrado.");
     }
 
     const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     if (!videoResponse.ok) {
-        throw new Error("Failed to download the generated video.");
+        const errorText = await videoResponse.text();
+        console.error("Video download error:", errorText);
+        throw new Error("Falha ao baixar o vídeo gerado.");
     }
     const videoBlob = await videoResponse.blob();
     return URL.createObjectURL(videoBlob);

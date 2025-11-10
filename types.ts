@@ -9,8 +9,8 @@ export interface SavedOutfit {
   id: number;
   // Store full data URLs for persistence
   clientImageUrl: string;
-  topImageUrl: string;
-  bottomImageUrl: string;
+  topImageUrl: string | null;
+  bottomImageUrl: string | null;
   generatedLookUrl: string;
   // Store raw base64 for API calls (e.g., re-editing)
   generatedLookBase64: string;
