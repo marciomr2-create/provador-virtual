@@ -87,13 +87,13 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ imageBase64, asp
         : 'Gerar Vídeo';
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-2">
              <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Descreva o vídeo que você quer criar (opcional)."
-                className="w-full p-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow resize-none"
-                rows={3}
+                className="w-full p-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow resize-none text-sm"
+                rows={2}
                 disabled={isGenerating || !imageBase64}
             />
             <button

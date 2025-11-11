@@ -67,8 +67,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImage
 
 
     return (
-        <div className="flex flex-col gap-2">
-            {label && <h3 className="text-lg font-medium text-amber-400">{label}</h3>}
+        <div className="flex flex-col gap-1">
+            {label && <h3 className="text-base font-medium text-amber-400">{label}</h3>}
             <div
                 className={areaClasses}
                 onClick={handleAreaClick}
@@ -80,7 +80,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImage
                     <img src={previewUrl} alt={label} className="w-full h-full object-cover rounded-lg" />
                 ) : (
                     <div className="flex items-center justify-center h-full">
-                        <span className="text-center text-sm p-4">{placeholderText}</span>
+                        <span className="text-center text-xs p-2">{placeholderText}</span>
                     </div>
                 )}
             </div>

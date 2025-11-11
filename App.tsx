@@ -1,29 +1,189 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { AppTab, ImageData, SavedOutfit } from './types';
-import {
-    fileToBase64,
-    generateLook,
-    editImageWithText,
-    generateImageFromPrompt
-} from './services/geminiService';
-import { ImageUploader } from './components/ImageUploader';
-import { EditImageModal } from './components/EditImageModal';
-import { HistoryPanel } from './components/HistoryPanel';
-import { VideoGenerator } from './components/VideoGenerator';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 
-const LoadingSpinner: React.FC<{text?: string}> = ({ text = "Generating..." }) => (
+// --- 1. Types ---
+type ImageData = {
+    file?: File;
+    url: string;
+};
+
+type AppTab = 'dressingRoom' | 'imageGenerator';
+
+type SavedOutfit = {
+    id: number;
+    clientImageUrl: string;
+    topImageUrl: string | null;
+    bottomImageUrl: string | null;
+    generatedLookUrl: string;
+    generatedLookBase64: string;
+};
+
+// --- 2. API Service ---
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+    });
+};
+
+// --- FUNÇÃO REAL (generateLook) ---
+const generateLook = async (
+    apiKey: string,
+    personB64: string, 
+    topB64: string | null, 
+    bottomB64: string | null
+): Promise<string> => {
+    console.log("API Real: Gerando look...");
+    
+    // Modelo de visão para edição de imagem
+    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
+
+    const promptParts: any[] = [
+        { text: "Você é um assistente de provador virtual. Seu trabalho é aplicar as peças de roupa (superior e/ou inferior) fornecidas sobre a imagem da pessoa. Mantenha o rosto, cabelo e corpo da pessoa 100% intactos. O resultado deve ser fotorrealista, ajustando caimento, textura e iluminação. Retorne APENAS a imagem final." },
+        { inlineData: { mimeType: "image/jpeg", data: personB64.split(',')[1] } },
+    ];
+
+    if (topB64) {
+        promptParts.push({ text: "Peça superior para aplicar:" });
+        promptParts.push({ inlineData: { mimeType: "image/jpeg", data: topB64.split(',')[1] } });
+    }
+    if (bottomB64) {
+        promptParts.push({ text: "Peça inferior para aplicar:" });
+        promptParts.push({ inlineData: { mimeType: "image/jpeg", data: bottomB64.split(',')[1] } });
+    }
+
+    const response = await fetch(`${API_URL}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ role: "user", parts: promptParts }],
+            "generationConfig": {
+                "responseModalities": ["IMAGE"]
+            }
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Erro da API Gemini:", errorText);
+        throw new Error(`Falha ao gerar look: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    const candidate = result.candidates?.[0];
+    
+    if (candidate && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+        const imagePart = candidate.content.parts[0];
+        if (imagePart.inlineData && imagePart.inlineData.data) {
+            const base64Data = imagePart.inlineData.data;
+            return base64Data;
+        }
+    }
+
+    console.error("Resposta da API não continha imagem:", result);
+    if (result.promptFeedback && result.promptFeedback.blockReason) {
+        throw new Error(`A API bloqueou o pedido: ${result.promptFeedback.blockReason}`);
+    }
+    throw new Error("A resposta da API não continha dados de imagem válidos.");
+};
+
+// --- FUNÇÃO REAL (editImageWithText) ---
+const editImageWithText = async (
+    apiKey: string,
+    imageBase64: string,
+    prompt: string
+): Promise<string> => {
+    console.log("API Real: Editando imagem...");
+
+    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
+
+    const promptParts: any[] = [
+        { text: `Você é um editor de fotos. Aplique esta mudança na imagem: "${prompt}". Mantenha o resto da imagem o mais intacto possível.` },
+        { inlineData: { mimeType: "image/jpeg", data: imageBase64.split(',')[1] } },
+    ];
+
+    const response = await fetch(`${API_URL}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ role: "user", parts: promptParts }],
+            "generationConfig": {
+                "responseModalities": ["IMAGE"]
+            }
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Erro da API Gemini (edição):", errorText);
+        throw new Error(`Falha ao editar imagem: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    const candidate = result.candidates?.[0];
+
+    if (candidate && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+        const imagePart = candidate.content.parts[0];
+        if (imagePart.inlineData && imagePart.inlineData.data) {
+            return imagePart.inlineData.data;
+        }
+    }
+
+    console.error("Resposta da API (edição) não continha imagem:", result);
+    if (result.promptFeedback && result.promptFeedback.blockReason) {
+        throw new Error(`A API bloqueou o pedido de edição: ${result.promptFeedback.blockReason}`);
+    }
+    throw new Error("A resposta da API (edição) não continha dados de imagem válidos.");
+};
+
+
+// --- FUNÇÃO MOCK (SIMULADA) (generateImageFromPrompt) ---
+const generateImageFromPrompt = async (prompt: string): Promise<string[]> => {
+    console.log("Mock API: Gerando imagem com prompt:", prompt);
+    await sleep(1500);
+    const response = await fetch(`https://placehold.co/512x512/374151/ca8a04?text=Mock:${encodeURI(prompt.slice(0, 20))}`);
+    const blob = await response.blob();
+    const base64 = await fileToBase64(blob as File);
+    return [base64.split(',')[1]];
+};
+
+// --- FUNÇÃO MOCK (SIMULADA) (generateVideo) ---
+// Removemos pollForVideo e a chamada real para VEO que estava dando erro 404
+async function generateVideo(
+    apiKey: string, 
+    videoPrompt: string, 
+    imageBase64: string
+): Promise<string> {
+    console.log('Iniciando geração de vídeo MOCK (SIMULAÇÃO)...');
+    console.log('Prompt:', videoPrompt);
+    // Simula o tempo de espera da API
+    await sleep(4000); 
+    console.log('Simulação de vídeo concluída.');
+    // Retorna um vídeo de exemplo
+    return 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+}
+
+
+// --- 3. Helper Components (sem alterações) ---
+
+const LoadingSpinner: React.FC = () => (
     <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex flex-col items-center justify-center rounded-lg z-10">
         <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <span className="text-lg font-medium text-teal-300 mt-2">{text}</span>
+        <span className="text-lg font-medium text-teal-300 mt-2">Generating...</span>
     </div>
 );
 
 const AppHeader: React.FC<{ activeTab: AppTab; onTabChange: (tab: AppTab) => void; }> = ({ activeTab, onTabChange }) => (
     <header className="bg-gray-800 border-b-2 border-amber-500 p-4 sticky top-0 z-20">
-        <div className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center">
+        <div className="w-full max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center">
             <h1 className="text-3xl font-bold text-amber-300 tracking-tight">Provador Digital<span className="text-teal-400">.AI</span></h1>
             <nav className="flex space-x-2 mt-4 sm:mt-0 bg-gray-900 p-1 rounded-lg">
                 <button
@@ -43,8 +203,164 @@ const AppHeader: React.FC<{ activeTab: AppTab; onTabChange: (tab: AppTab) => voi
     </header>
 );
 
+interface ImageUploaderProps {
+    id: string;
+    label: string;
+    onImageUpload: (data: ImageData) => void;
+    previewUrl?: string;
+    placeholderText: string;
+    aspectRatio?: 'portrait' | 'square';
+}
+
+const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImageUpload, previewUrl, placeholderText, aspectRatio = 'square' }) => {
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFile = (file: File) => {
+        if (file && file.type.startsWith('image/')) {
+            const fileUrl = URL.createObjectURL(file);
+            onImageUpload({ file, url: fileUrl });
+        }
+    };
+
+    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    }, [onImageUpload]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFile(e.target.files[0]);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault(); e.stopPropagation(); setIsDragging(true);
+    };
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault(); e.stopPropagation(); setIsDragging(false);
+    };
+    const handleClick = () => fileInputRef.current?.click();
+
+    const aspectClass = aspectRatio === 'portrait' ? 'aspect-[9/16]' : 'aspect-square';
+
+    return (
+        <div className="flex flex-col gap-2">
+            {label && <label htmlFor={id} className="text-sm font-medium text-amber-200">{label}</label>}
+            <div
+                onClick={handleClick}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`relative w-full ${aspectClass} bg-gray-700 border-2 border-dashed border-gray-500 rounded-lg flex items-center justify-center text-center text-gray-400 cursor-pointer transition-colors hover:border-teal-400 ${isDragging ? 'border-teal-400 bg-gray-600' : ''}`}
+            >
+                {previewUrl ? (
+                    <img src={previewUrl} alt="Preview" className="w-full h-full object-contain rounded-lg" />
+                ) : (
+                    <span>{placeholderText}</span>
+                )}
+                <input
+                    id={id}
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleChange}
+                    className="hidden"
+                />
+            </div>
+        </div>
+    );
+};
+
+interface EditImageModalProps {
+    imageUrl: string;
+    onClose: () => void;
+    onEdit: (prompt: string) => void;
+    isEditing: boolean;
+}
+
+const EditImageModal: React.FC<EditImageModalProps> = ({ imageUrl, onClose, onEdit, isEditing }) => {
+    const [prompt, setPrompt] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (prompt.trim()) {
+            onEdit(prompt);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-amber-400">Editar Imagem</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">&times;</button>
+                </div>
+                <div className="flex flex-col md:flex-row gap-4">
+                    <img src={imageUrl} alt="Para editar" className="w-full md:w-1/2 rounded-lg" />
+                    <form onSubmit={handleSubmit} className="flex flex-col flex-1">
+                        <label htmlFor="edit-prompt" className="text-sm text-gray-300 mb-2">Descreva a mudança:</label>
+                        <textarea
+                            id="edit-prompt"
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            placeholder="Ex: Mude a cor da blusa para vermelho"
+                            className="w-full p-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg flex-grow resize-none"
+                            rows={4}
+                            disabled={isEditing}
+                        />
+                        <div className="flex gap-2 mt-4">
+                            <button type="button" onClick={onClose} className="btn-secondary flex-1" disabled={isEditing}>Cancelar</button>
+                            <button type="submit" className="btn-primary flex-1" disabled={!prompt.trim() || isEditing}>
+                                {isEditing ? 'Editando...' : 'Aplicar'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface HistoryPanelProps {
+    outfits: SavedOutfit[];
+    onLoad: (outfit: SavedOutfit) => void;
+    onDelete: (id: number) => void;
+}
+
+const HistoryPanel: React.FC<HistoryPanelProps> = ({ outfits, onLoad, onDelete }) => (
+    <div className="panel">
+        <h2 className="text-xl font-semibold text-amber-400 mb-4">Looks Salvos</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {outfits.map(outfit => (
+                <div key={outfit.id} className="bg-gray-700 rounded-lg overflow-hidden shadow">
+                    <img src={outfit.generatedLookUrl} alt="Look salvo" className="w-full aspect-[9/16] object-cover" />
+                    <div className="p-2 flex flex-col gap-2">
+                        <button onClick={() => onLoad(outfit)} className="btn-secondary text-sm w-full">Carregar</button>
+                        <button onClick={() => onDelete(outfit.id)} className="bg-red-700 hover:bg-red-600 text-white text-sm py-1 px-2 rounded w-full">Excluir</button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+
+// --- 4. Main App Component ---
 function App() {
     const [activeTab, setActiveTab] = useState<AppTab>('dressingRoom');
+
+    // --- States de Vídeo ---
+    const [videoPrompt, setVideoPrompt] = useState('');
+    const [videoUrl, setVideoUrl] = useState('');
+    const [isVideoLoading, setIsVideoLoading] = useState(false);
+    
+    // Estado para a Key (gerenciamento centralizado)
+    const [apiKey, setApiKey] = useState(''); 
 
     // Dressing Room State
     const [clientImage, setClientImage] = useState<ImageData | null>(null);
@@ -57,106 +373,164 @@ function App() {
     const [isEditing, setIsEditing] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
-    const [error, setError] = useState<string | null>(null);
-
-    // Video State
-    const [videoUrl, setVideoUrl] = useState<string | null>(null);
-    const [isVideoGenerating, setIsVideoGenerating] = useState(false);
 
     // Image Generator State
     const [prompt, setPrompt] = useState('');
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-
+    
+    // --- LocalStorage Effects for Persistence ---
     useEffect(() => {
         try {
             const storedOutfits = localStorage.getItem('savedOutfits');
             if (storedOutfits) {
                 setSavedOutfits(JSON.parse(storedOutfits));
             }
-        } catch (e) {
-            console.error("Failed to load saved outfits from localStorage", e);
+            // Tenta carregar a API key salva
+            const storedKey = localStorage.getItem('geminiApiKey');
+            if(storedKey) {
+                setApiKey(storedKey);
+            }
+        } catch (error) {
+            console.error("Failed to load data from localStorage", error);
         }
     }, []);
 
     useEffect(() => {
         try {
             localStorage.setItem('savedOutfits', JSON.stringify(savedOutfits));
-        } catch (e) {
-            console.error("Failed to save outfits to localStorage", e);
+        } catch (error) {
+            console.error("Failed to save outfits to localStorage", error);
         }
     }, [savedOutfits]);
     
-    const handleVideoGenerationState = useCallback((isGenerating: boolean, generationError: string | null) => {
-        setIsVideoGenerating(isGenerating);
-        if (generationError) {
-             setError(generationError);
+    // Salva a API key no localStorage
+    const handleApiKeyChange = (key: string) => {
+        setApiKey(key);
+        localStorage.setItem('geminiApiKey', key);
+    }
+    
+    // Pede a API Key se não tiver
+    const getApiKey = (): string | null => {
+        if (apiKey) return apiKey;
+        
+        const key = window.prompt("Por favor, insira sua API Key do Google AI Studio:");
+        if(key) {
+            handleApiKeyChange(key);
+            return key;
+        } else {
+             alert('API Key é necessária para esta ação.');
+             return null;
         }
-    }, []);
+    }
 
+
+    // --- Core Handlers ---
     const handleCreateLook = useCallback(async () => {
         if (!clientImage?.file || (!topImage?.file && !bottomImage?.file)) {
             alert("Por favor, envie a imagem do cliente e pelo menos uma peça de roupa a partir de um arquivo.");
             return;
         }
+        
+        const currentApiKey = getApiKey();
+        if (!currentApiKey) return;
+        
         setIsCreatingLook(true);
         setGeneratedLook(null);
         setGeneratedLookBase64(null);
-        setVideoUrl(null);
-        setError(null);
+        setVideoUrl('');
         try {
             const personB64 = await fileToBase64(clientImage.file);
             const topB64 = topImage?.file ? await fileToBase64(topImage.file) : null;
             const bottomB64 = bottomImage?.file ? await fileToBase64(bottomImage.file) : null;
 
-            const resultB64 = await generateLook(personB64, topB64, bottomB64);
+            // Chama a função REAL
+            const resultB64 = await generateLook(currentApiKey, personB64, topB64, bottomB64);
+            
             setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
             setGeneratedLookBase64(resultB64);
-        } catch (err: any) {
-            console.error(err);
-            setError(`Falha ao criar o look: ${err.message}`);
+        } catch (error) {
+            console.error(error);
+            alert(`Falha ao criar o look: ${error.message}`);
         } finally {
             setIsCreatingLook(false);
         }
-    }, [clientImage, topImage, bottomImage]);
+    }, [clientImage, topImage, bottomImage, apiKey]); // Adiciona apiKey às dependências
 
     const handleEditLook = useCallback(async (editPrompt: string) => {
         if (!generatedLookBase64) return;
+        
+        const currentApiKey = getApiKey();
+        if (!currentApiKey) return;
+        
         setIsEditing(true);
-        setError(null);
         try {
-            const resultB64 = await editImageWithText(generatedLookBase64, editPrompt);
-            const newLookUrl = `data:image/jpeg;base64,${resultB64}`;
-            setGeneratedLook(newLookUrl);
+            // Chama a função REAL
+            const resultB64 = await editImageWithText(currentApiKey, generatedLookBase64, editPrompt);
+            
+            setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
             setGeneratedLookBase64(resultB64);
             setShowEditModal(false);
-            setVideoUrl(null); // Reset video after edit
-        } catch (err: any) {
-            console.error(err);
-            setError(`Falha ao editar a imagem: ${err.message}`);
+        } catch (error) {
+            console.error(error);
+            alert(`Falha ao editar a imagem: ${error.message}`);
         } finally {
             setIsEditing(false);
         }
-    }, [generatedLookBase64]);
+    }, [generatedLookBase64, apiKey]); // Adiciona apiKey
 
+    const handleGenerateVideo = async () => {
+        if (!generatedLookBase64) {
+            alert('Gere um look primeiro.');
+            return;
+        }
+        if (!videoPrompt) {
+            alert('Por favor, insira um prompt para o vídeo.');
+            return;
+        }
+        
+        // A simulação não precisa de chave, mas mantemos o fluxo
+        // const currentApiKey = getApiKey();
+        // if (!currentApiKey) return;
+        
+        try {
+            setIsVideoLoading(true);
+            setVideoUrl(''); 
+            const imageBase64 = generatedLookBase64;
+            // Chama a função SIMULADA
+            const url = await generateVideo(apiKey, videoPrompt, imageBase64);
+            setVideoUrl(url);
+        } catch (error) {
+            console.error(error);
+            alert(`Erro ao gerar vídeo: ${error.message}`);
+        } finally {
+            setIsVideoLoading(false);
+        }
+    };
+    
     const handleGenerateImage = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         if (!prompt.trim()) return;
+        
+        // A função generateImageFromPrompt também precisaria da key se fosse real
+        // const currentApiKey = getApiKey();
+        // if (!currentApiKey) return;
+        
         setIsGeneratingImage(true);
         setGeneratedImage(null);
-        setError(null);
         try {
-            const results = await generateImageFromPrompt(prompt);
+            const results = await generateImageFromPrompt(prompt); // Usando mock
             if (results.length > 0) {
                 setGeneratedImage(`data:image/jpeg;base64,${results[0]}`);
             }
-        } catch (err: any) {
-            console.error(err);
-            setError(`Falha ao gerar a imagem: ${err.message}`);
+        } catch (error)
+         {
+            console.error(error);
+            alert("Falha ao gerar a imagem. Veja o console para detalhes.");
         } finally {
             setIsGeneratingImage(false);
         }
-    }, [prompt]);
+    }, [prompt, apiKey]); // Adiciona apiKey
 
     const handleDownload = () => {
         if (!generatedLook) return;
@@ -168,9 +542,10 @@ function App() {
         document.body.removeChild(link);
     };
 
-    const handleSaveOutfit = useCallback(() => {
+    // --- History Handlers ---
+    const handleSaveOutfit = useCallback(async () => {
         if (!clientImage?.url || (!topImage?.url && !bottomImage?.url) || !generatedLook || !generatedLookBase64) {
-            alert("Não é possível salvar. Certifique-se de que a imagem do cliente, pelo menos uma peça de roupa e um look gerado estejam presentes.");
+            alert("Não é possível salvar o look...");
             return;
         }
         const newOutfit: SavedOutfit = {
@@ -191,9 +566,8 @@ function App() {
         setBottomImage(outfit.bottomImageUrl ? { url: outfit.bottomImageUrl } : null);
         setGeneratedLook(outfit.generatedLookUrl);
         setGeneratedLookBase64(outfit.generatedLookBase64);
-        setVideoUrl(null);
-        setError(null);
-        alert("Look carregado. Agora você pode editá-lo ou gerar um vídeo.");
+        setVideoUrl(''); 
+        alert("Look carregado.");
         window.scrollTo(0, 0);
     }, []);
 
@@ -201,60 +575,101 @@ function App() {
         setSavedOutfits(prev => prev.filter(outfit => outfit.id !== id));
     }, []);
 
+    // --- Render Functions ---
+
     const renderDressingRoom = () => (
         <div className="flex flex-col">
-            <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+            <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
                 <div className="panel flex flex-col gap-4">
                     <h2 className="text-xl font-semibold text-amber-400">1. Imagem do Cliente</h2>
-                    <ImageUploader id="client-img" label="" onImageUpload={setClientImage} previewUrl={clientImage?.url} placeholderText="Arraste ou clique para enviar a foto" aspectRatio="portrait" />
+                    <ImageUploader id="cliente-img-input" label="" onImageUpload={setClientImage} previewUrl={clientImage?.url} placeholderText="Arraste ou clique para enviar a foto do cliente" aspectRatio="portrait" />
                 </div>
 
                 <div className="panel flex flex-col gap-4">
                     <h2 className="text-xl font-semibold text-amber-400">2. Itens de Vestuário</h2>
-                    <ImageUploader id="top-img" label="Superior" onImageUpload={setTopImage} previewUrl={topImage?.url} placeholderText="Peça Superior" aspectRatio="square" />
-                    <ImageUploader id="bottom-img" label="Inferior" onImageUpload={setBottomImage} previewUrl={bottomImage?.url} placeholderText="Peça Inferior" aspectRatio="square" />
-                    <button className="btn-primary w-full mt-auto" onClick={handleCreateLook} disabled={!clientImage?.file || (!topImage?.file && !bottomImage?.file) || isCreatingLook}>
+                    <div className="flex flex-col gap-4 flex-grow overflow-y-auto min-h-0">
+                        <ImageUploader id="superior-img-input" label="Superior" onImageUpload={setTopImage} previewUrl={topImage?.url} placeholderText="Peça Superior" />
+                        <ImageUploader id="inferior-img-input" label="Inferior" onImageUpload={setBottomImage} previewUrl={bottomImage?.url} placeholderText="Peça Inferior" />
+                    </div>
+                    <button 
+                        id="criar-look-btn" 
+                        className="btn-primary w-full mt-auto" 
+                        onClick={handleCreateLook} 
+                        disabled={!clientImage?.file || (!topImage?.file && !bottomImage?.file) || isCreatingLook}
+                    >
                         {isCreatingLook ? 'Criando Look...' : 'Criar Look'}
                     </button>
                 </div>
-
+                
                 <div className="panel flex flex-col gap-4">
                     <h2 className="text-xl font-semibold text-amber-400">3. Resultado Gerado</h2>
-                    <div className={`relative w-full bg-gray-700 rounded-lg flex items-center justify-center transition-all duration-300 ${aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-[16/9]'}`}>
+                    <div id="resultado-container" className={`relative w-full bg-gray-700 rounded-lg flex items-center justify-center transition-all duration-300 ${aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-[16/9]'}`}>
                         {isCreatingLook && <LoadingSpinner />}
-                        {isVideoGenerating && <LoadingSpinner text="Gerando Vídeo..." />}
                         
                         {videoUrl ? (
-                            <video key={videoUrl} src={videoUrl} controls autoPlay loop className="w-full h-full object-contain rounded-lg bg-black" />
+                            <video 
+                                src={videoUrl} 
+                                controls 
+                                autoPlay 
+                                loop 
+                                className="w-full h-full object-contain rounded-lg"
+                            />
                         ) : (
-                            <img src={generatedLook ?? `https://placehold.co/${aspectRatio === '9:16' ? '900x1600' : '1600x900'}/374151/ca8a04?text=Aguardando...`} alt="Look Gerado" className="w-full h-full object-contain rounded-lg" />
+                            <img id="resultado-img" src={generatedLook ?? `https://placehold.co/${aspectRatio === '9:16' ? '900x1600' : '1600x900'}/374151/ca8a04?text=Aguardando...`} alt="Look Gerado" className="w-full h-full object-contain rounded-lg" />
+                        )}
+                        {isVideoLoading && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg z-20">
+                                <p className="text-white text-lg">Gerando Vídeo...</p>
+                            </div>
                         )}
                     </div>
-                    {error && <p className="text-red-500 text-center text-sm mt-2">{error}</p>}
                     <div className="flex flex-col gap-4 mt-auto">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <button onClick={() => setShowEditModal(true)} className="btn-secondary flex-1" disabled={!generatedLook || isVideoGenerating}>Editar</button>
-                            <button onClick={handleDownload} className="btn-secondary flex-1" disabled={!generatedLook || isVideoGenerating}>Baixar</button>
-                            <button onClick={handleSaveOutfit} className="btn-secondary flex-1" disabled={!generatedLook || isVideoGenerating || !clientImage || (!topImage && !bottomImage)}>Salvar</button>
-                        </div>
-                        <div className="border-t border-gray-600 pt-4 mt-2">
-                            <h3 className="text-lg font-medium text-amber-400 mb-2">Gerar Vídeo a partir da Imagem</h3>
-                             <div className="flex gap-2 mb-4">
+                        <div>
+                            <h3 className="text-lg font-medium text-amber-400">Proporção</h3>
+                            <div className="flex gap-2 mt-1">
                                 {(['9:16', '16:9'] as const).map(ratio => (
-                                    <button key={ratio} onClick={() => { setAspectRatio(ratio); setVideoUrl(null); }} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${aspectRatio === ratio ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`} disabled={isVideoGenerating}>
+                                    <button key={ratio} onClick={() => setAspectRatio(ratio)} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${aspectRatio === ratio ? 'bg-teal-600 text-white' : 'bg-gray-600 text-gray-200 hover:bg-gray-500'}`}>
                                         {ratio} {ratio === '9:16' ? '(V)' : '(H)'}
                                     </button>
                                 ))}
                             </div>
-                             <VideoGenerator imageBase64={generatedLookBase64} aspectRatio={aspectRatio} onVideoGenerated={setVideoUrl} onGenerationStateChange={handleVideoGenerationState} />
+                        </div>
+                        <div id="post-actions" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <button onClick={() => setShowEditModal(true)} className="btn-secondary flex-1" disabled={!generatedLook}>Editar</button>
+                            <button onClick={handleDownload} className="btn-secondary flex-1" disabled={!generatedLook}>Baixar</button>
+                            <button onClick={handleSaveOutfit} className="btn-secondary flex-1" disabled={!generatedLook || !clientImage || (!topImage && !bottomImage)}>Salvar</button>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                             <input 
+                                type="text" 
+                                id="video-prompt-input" 
+                                placeholder="Ex: 'Zoom suave' ou 'Giro 360'" 
+                                className="w-full p-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-md text-sm"
+                                value={videoPrompt}
+                                onChange={(e) => setVideoPrompt(e.target.value)}
+                                disabled={isVideoLoading}
+                            />
+                             <button 
+                                id="editar-video-btn" 
+                                className="btn-primary w-full" 
+                                onClick={handleGenerateVideo}
+                                disabled={isVideoLoading || !generatedLook}
+                            >
+                                {isVideoLoading ? 'Gerando Vídeo...' : 'Gerar Vídeo'}
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-            {savedOutfits.length > 0 && (
-                <div className="px-6 pb-6">
-                    <HistoryPanel outfits={savedOutfits} onLoad={handleLoadOutfit} onDelete={handleDeleteOutfit} />
-                </div>
+             {savedOutfits.length > 0 && (
+                 <div className="px-6 pb-6">
+                     <HistoryPanel
+                         outfits={savedOutfits}
+                         onLoad={handleLoadOutfit}
+                         onDelete={handleDeleteOutfit}
+                     />
+                 </div>
             )}
             {showEditModal && generatedLook && (
                 <EditImageModal imageUrl={generatedLook} onClose={() => setShowEditModal(false)} onEdit={handleEditLook} isEditing={isEditing} />
@@ -268,8 +683,19 @@ function App() {
                 <h2 className="text-2xl font-bold text-amber-400 mb-4">Gerador de Imagem AI</h2>
                 <p className="text-gray-300 mb-6">Descreva a imagem que você quer criar. Seja detalhista para melhores resultados.</p>
                 <form onSubmit={handleGenerateImage} className="flex flex-col gap-4">
-                    <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ex: Um astronauta andando a cavalo em marte, arte digital fotorrealista" className="w-full p-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow resize-none" rows={4} disabled={isGeneratingImage} />
-                    <button type="submit" className="btn-primary w-full" disabled={!prompt.trim() || isGeneratingImage}>
+                    <textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Ex: Um astronauta andando a cavalo em marte, arte digital fotorrealista"
+                        className="w-full p-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow resize-none"
+                        rows={4}
+                        disabled={isGeneratingImage}
+                    />
+                    <button
+                        type="submit"
+                        className="btn-primary w-full"
+                        disabled={!prompt.trim() || isGeneratingImage}
+                    >
                         {isGeneratingImage ? 'Gerando...' : 'Gerar Imagem'}
                     </button>
                 </form>
@@ -284,15 +710,35 @@ function App() {
                         <p className="text-gray-400">A imagem gerada aparecerá aqui.</p>
                     )}
                 </div>
-                 {error && <p className="text-red-500 text-center text-sm mt-2">{error}</p>}
             </div>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-gray-900 text-amber-300 flex flex-col">
+        <div className="h-screen bg-gray-900 text-amber-300 flex flex-col">
+            <style>{`
+                /* Estilos Globais para Tailwind */
+                .panel { background-color: #1f2937; /* gray-800 */ border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
+                .btn-primary { background-color: #0d9488; /* teal-600 */ color: white; font-weight: 600; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: background-color 0.2s; }
+                .btn-primary:hover { background-color: #0f766e; /* teal-700 */ }
+                .btn-primary:disabled { background-color: #4b5563; /* gray-600 */ cursor: not-allowed; }
+                .btn-secondary { background-color: #4b5563; /* gray-600 */ color: #e5e7eb; /* gray-200 */ font-weight: 600; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: background-color 0.2s; }
+                .btn-secondary:hover { background-color: #374151; /* gray-700 */ }
+                .btn-secondary:disabled { background-color: #374151; /* gray-700 */ color: #6b7280; /* gray-500 */ cursor: not-allowed; }
+            `}</style>
             <AppHeader activeTab={activeTab} onTabChange={setActiveTab} />
             <main className="flex-grow overflow-y-auto">
+                <div className="w-full max-w-5xl mx-auto p-4">
+                    <label htmlFor="api-key-input" className="text-sm font-medium text-amber-400">API Key:</label>
+                    <input 
+                        id="api-key-input"
+                        type="password" 
+                        value={apiKey}
+                        onChange={(e) => handleApiKeyChange(e.target.value)}
+                        placeholder="Insira sua Google AI API Key aqui"
+                        className="w-full p-2 mt-1 bg-gray-700 border border-gray-600 text-gray-200 rounded-md text-sm"
+                    />
+                </div>
                 {activeTab === 'dressingRoom' ? renderDressingRoom() : renderImageGenerator()}
             </main>
         </div>
