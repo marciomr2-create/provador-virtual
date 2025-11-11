@@ -30,23 +30,20 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-// --- FUNÇÃO REAL (generateLook) ---
+// --- FUNÇÃO REAL (generateLook - Google Gemini) ---
 const generateLook = async (
     apiKey: string,
     personB64: string, 
     topB64: string | null, 
     bottomB64: string | null
 ): Promise<string> => {
-    console.log("API Real: Gerando look...");
-    
-    // Modelo de visão para edição de imagem
+    console.log("API Real (Google): Gerando look...");
     const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
 
     const promptParts: any[] = [
         { text: "Você é um assistente de provador virtual. Seu trabalho é aplicar as peças de roupa (superior e/ou inferior) fornecidas sobre a imagem da pessoa. Mantenha o rosto, cabelo e corpo da pessoa 100% intactos. O resultado deve ser fotorrealista, ajustando caimento, textura e iluminação. Retorne APENAS a imagem final." },
         { inlineData: { mimeType: "image/jpeg", data: personB64.split(',')[1] } },
     ];
-
     if (topB64) {
         promptParts.push({ text: "Peça superior para aplicar:" });
         promptParts.push({ inlineData: { mimeType: "image/jpeg", data: topB64.split(',')[1] } });
@@ -74,9 +71,7 @@ const generateLook = async (
     }
 
     const result = await response.json();
-    
     const candidate = result.candidates?.[0];
-    
     if (candidate && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
         const imagePart = candidate.content.parts[0];
         if (imagePart.inlineData && imagePart.inlineData.data) {
@@ -84,22 +79,20 @@ const generateLook = async (
             return base64Data;
         }
     }
-
-    console.error("Resposta da API não continha imagem:", result);
+    console.error("Resposta da API (Google) não continha imagem:", result);
     if (result.promptFeedback && result.promptFeedback.blockReason) {
-        throw new Error(`A API bloqueou o pedido: ${result.promptFeedback.blockReason}`);
+        throw new Error(`A API (Google) bloqueou o pedido: ${result.promptFeedback.blockReason}`);
     }
-    throw new Error("A resposta da API não continha dados de imagem válidos.");
+    throw new Error("A resposta da API (Google) não continha dados de imagem válidos.");
 };
 
-// --- FUNÇÃO REAL (editImageWithText) ---
+// --- FUNÇÃO REAL (editImageWithText - Google Gemini) ---
 const editImageWithText = async (
     apiKey: string,
     imageBase64: string,
     prompt: string
 ): Promise<string> => {
-    console.log("API Real: Editando imagem...");
-
+    console.log("API Real (Google): Editando imagem...");
     const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
 
     const promptParts: any[] = [
@@ -126,14 +119,12 @@ const editImageWithText = async (
 
     const result = await response.json();
     const candidate = result.candidates?.[0];
-
     if (candidate && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
         const imagePart = candidate.content.parts[0];
         if (imagePart.inlineData && imagePart.inlineData.data) {
             return imagePart.inlineData.data;
         }
     }
-
     console.error("Resposta da API (edição) não continha imagem:", result);
     if (result.promptFeedback && result.promptFeedback.blockReason) {
         throw new Error(`A API bloqueou o pedido de edição: ${result.promptFeedback.blockReason}`);
@@ -141,8 +132,7 @@ const editImageWithText = async (
     throw new Error("A resposta da API (edição) não continha dados de imagem válidos.");
 };
 
-
-// --- FUNÇÃO MOCK (SIMULADA) (generateImageFromPrompt) ---
+// --- FUNÇÃO MOCK (SIMULADA) (generateImageFromPrompt - Google Gemini) ---
 const generateImageFromPrompt = async (prompt: string): Promise<string[]> => {
     console.log("Mock API: Gerando imagem com prompt:", prompt);
     await sleep(1500);
@@ -152,17 +142,16 @@ const generateImageFromPrompt = async (prompt: string): Promise<string[]> => {
     return [base64.split(',')[1]];
 };
 
-// --- FUNÇÃO MOCK (SIMULADA) (generateVideo) ---
-// Removemos pollForVideo e a chamada real para VEO que estava dando erro 404
-async function generateVideo(
-    apiKey: string, 
-    videoPrompt: string, 
+// --- MUDANÇA: Voltamos para a SIMULAÇÃO de vídeo ---
+/**
+ * Simula a geração do vídeo (já que a API do Stability não está acessível)
+ */
+async function stabilityGenerateVideo(
+    apiKey: string, // (Não será usada, mas mantemos a assinatura)
     imageBase64: string
 ): Promise<string> {
     console.log('Iniciando geração de vídeo MOCK (SIMULAÇÃO)...');
-    console.log('Prompt:', videoPrompt);
-    // Simula o tempo de espera da API
-    await sleep(4000); 
+    await sleep(4000); // Simula o tempo de espera da API
     console.log('Simulação de vídeo concluída.');
     // Retorna um vídeo de exemplo
     return 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
@@ -355,12 +344,12 @@ function App() {
     const [activeTab, setActiveTab] = useState<AppTab>('dressingRoom');
 
     // --- States de Vídeo ---
-    const [videoPrompt, setVideoPrompt] = useState('');
     const [videoUrl, setVideoUrl] = useState('');
     const [isVideoLoading, setIsVideoLoading] = useState(false);
     
-    // Estado para a Key (gerenciamento centralizado)
-    const [apiKey, setApiKey] = useState(''); 
+    // --- MUDANÇA: Apenas a chave do Google é necessária ---
+    const [googleApiKey, setGoogleApiKey] = useState(''); 
+    // const [stabilityApiKey, setStabilityApiKey] = useState(''); // Removida
 
     // Dressing Room State
     const [clientImage, setClientImage] = useState<ImageData | null>(null);
@@ -386,10 +375,10 @@ function App() {
             if (storedOutfits) {
                 setSavedOutfits(JSON.parse(storedOutfits));
             }
-            // Tenta carregar a API key salva
-            const storedKey = localStorage.getItem('geminiApiKey');
-            if(storedKey) {
-                setApiKey(storedKey);
+            // Carrega apenas a chave do Google
+            const storedGoogleKey = localStorage.getItem('googleApiKey');
+            if(storedGoogleKey) {
+                setGoogleApiKey(storedGoogleKey);
             }
         } catch (error) {
             console.error("Failed to load data from localStorage", error);
@@ -404,22 +393,21 @@ function App() {
         }
     }, [savedOutfits]);
     
-    // Salva a API key no localStorage
-    const handleApiKeyChange = (key: string) => {
-        setApiKey(key);
-        localStorage.setItem('geminiApiKey', key);
+    // Handlers para a chave do Google
+    const handleGoogleApiKeyChange = (key: string) => {
+        setGoogleApiKey(key);
+        localStorage.setItem('googleApiKey', key);
     }
     
-    // Pede a API Key se não tiver
-    const getApiKey = (): string | null => {
-        if (apiKey) return apiKey;
-        
-        const key = window.prompt("Por favor, insira sua API Key do Google AI Studio:");
+    // Pede a API Key do Google
+    const getGoogleApiKey = (): string | null => {
+        if (googleApiKey) return googleApiKey;
+        const key = window.prompt("Por favor, insira sua API Key do GOOGLE AI Studio:");
         if(key) {
-            handleApiKeyChange(key);
+            handleGoogleApiKeyChange(key);
             return key;
         } else {
-             alert('API Key é necessária para esta ação.');
+             alert('API Key do Google é necessária para esta ação.');
              return null;
         }
     }
@@ -428,11 +416,11 @@ function App() {
     // --- Core Handlers ---
     const handleCreateLook = useCallback(async () => {
         if (!clientImage?.file || (!topImage?.file && !bottomImage?.file)) {
-            alert("Por favor, envie a imagem do cliente e pelo menos uma peça de roupa a partir de um arquivo.");
+            alert("Por favor, envie a imagem do cliente e pelo menos uma peça de roupa.");
             return;
         }
         
-        const currentApiKey = getApiKey();
+        const currentApiKey = getGoogleApiKey();
         if (!currentApiKey) return;
         
         setIsCreatingLook(true);
@@ -444,7 +432,6 @@ function App() {
             const topB64 = topImage?.file ? await fileToBase64(topImage.file) : null;
             const bottomB64 = bottomImage?.file ? await fileToBase64(bottomImage.file) : null;
 
-            // Chama a função REAL
             const resultB64 = await generateLook(currentApiKey, personB64, topB64, bottomB64);
             
             setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
@@ -455,17 +442,16 @@ function App() {
         } finally {
             setIsCreatingLook(false);
         }
-    }, [clientImage, topImage, bottomImage, apiKey]); // Adiciona apiKey às dependências
+    }, [clientImage, topImage, bottomImage, googleApiKey]);
 
     const handleEditLook = useCallback(async (editPrompt: string) => {
         if (!generatedLookBase64) return;
         
-        const currentApiKey = getApiKey();
+        const currentApiKey = getGoogleApiKey();
         if (!currentApiKey) return;
         
         setIsEditing(true);
         try {
-            // Chama a função REAL
             const resultB64 = await editImageWithText(currentApiKey, generatedLookBase64, editPrompt);
             
             setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
@@ -477,28 +463,23 @@ function App() {
         } finally {
             setIsEditing(false);
         }
-    }, [generatedLookBase64, apiKey]); // Adiciona apiKey
+    }, [generatedLookBase64, googleApiKey]);
 
     const handleGenerateVideo = async () => {
         if (!generatedLookBase64) {
             alert('Gere um look primeiro.');
             return;
         }
-        if (!videoPrompt) {
-            alert('Por favor, insira um prompt para o vídeo.');
-            return;
-        }
         
-        // A simulação não precisa de chave, mas mantemos o fluxo
-        // const currentApiKey = getApiKey();
-        // if (!currentApiKey) return;
+        // A chave do Stability não é mais necessária para a simulação
         
         try {
             setIsVideoLoading(true);
             setVideoUrl(''); 
             const imageBase64 = generatedLookBase64;
+            
             // Chama a função SIMULADA
-            const url = await generateVideo(apiKey, videoPrompt, imageBase64);
+            const url = await stabilityGenerateVideo("simulated_key", imageBase64);
             setVideoUrl(url);
         } catch (error) {
             console.error(error);
@@ -511,11 +492,6 @@ function App() {
     const handleGenerateImage = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         if (!prompt.trim()) return;
-        
-        // A função generateImageFromPrompt também precisaria da key se fosse real
-        // const currentApiKey = getApiKey();
-        // if (!currentApiKey) return;
-        
         setIsGeneratingImage(true);
         setGeneratedImage(null);
         try {
@@ -530,7 +506,7 @@ function App() {
         } finally {
             setIsGeneratingImage(false);
         }
-    }, [prompt, apiKey]); // Adiciona apiKey
+    }, [prompt]);
 
     const handleDownload = () => {
         if (!generatedLook) return;
@@ -640,25 +616,15 @@ function App() {
                             <button onClick={handleSaveOutfit} className="btn-secondary flex-1" disabled={!generatedLook || !clientImage || (!topImage && !bottomImage)}>Salvar</button>
                         </div>
 
-                        <div className="flex flex-col gap-2">
-                             <input 
-                                type="text" 
-                                id="video-prompt-input" 
-                                placeholder="Ex: 'Zoom suave' ou 'Giro 360'" 
-                                className="w-full p-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-md text-sm"
-                                value={videoPrompt}
-                                onChange={(e) => setVideoPrompt(e.target.value)}
-                                disabled={isVideoLoading}
-                            />
-                             <button 
-                                id="editar-video-btn" 
-                                className="btn-primary w-full" 
-                                onClick={handleGenerateVideo}
-                                disabled={isVideoLoading || !generatedLook}
-                            >
-                                {isVideoLoading ? 'Gerando Vídeo...' : 'Gerar Vídeo'}
-                            </button>
-                        </div>
+                        {/* Campo de prompt de vídeo removido */}
+                        <button 
+                            id="editar-video-btn" 
+                            className="btn-primary w-full mt-2" 
+                            onClick={handleGenerateVideo}
+                            disabled={isVideoLoading || !generatedLook}
+                        >
+                            {isVideoLoading ? 'Gerando Vídeo...' : 'Gerar Vídeo'}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -729,15 +695,18 @@ function App() {
             <AppHeader activeTab={activeTab} onTabChange={setActiveTab} />
             <main className="flex-grow overflow-y-auto">
                 <div className="w-full max-w-5xl mx-auto p-4">
-                    <label htmlFor="api-key-input" className="text-sm font-medium text-amber-400">API Key:</label>
-                    <input 
-                        id="api-key-input"
-                        type="password" 
-                        value={apiKey}
-                        onChange={(e) => handleApiKeyChange(e.target.value)}
-                        placeholder="Insira sua Google AI API Key aqui"
-                        className="w-full p-2 mt-1 bg-gray-700 border border-gray-600 text-gray-200 rounded-md text-sm"
-                    />
+                    {/* --- MUDANÇA: Apenas uma chave de API --- */}
+                    <div>
+                        <label htmlFor="google-api-key-input" className="text-sm font-medium text-amber-400">Google AI API Key (Imagens)</label>
+                        <input 
+                            id="google-api-key-input"
+                            type="password" 
+                            value={googleApiKey}
+                            onChange={(e) => handleGoogleApiKeyChange(e.target.value)}
+                            placeholder="Insira sua chave do Google AI Studio"
+                            className="w-full p-2 mt-1 bg-gray-700 border border-gray-600 text-gray-200 rounded-md text-sm"
+                        />
+                    </div>
                 </div>
                 {activeTab === 'dressingRoom' ? renderDressingRoom() : renderImageGenerator()}
             </main>
