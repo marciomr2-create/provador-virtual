@@ -15,35 +15,45 @@ export const fileToBase64 = (file: File): Promise<string> => {
 export const generateLook = async (person: string, top: string | null, bottom: string | null): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    let clothingPrompt = '';
+    let instruction = `INSTRUÇÃO PRINCIPAL: Substitua a roupa da pessoa na imagem base pelas novas peças de roupa fornecidas. A imagem final deve ser fotorrealista e crível.
+
+IMAGENS DE ENTRADA:
+- Imagem 1: Pessoa Base (modelo).
+- Imagem 2 (se fornecida): Peça de Roupa Superior.
+- Imagem 3 (se fornecida): Peça de Roupa Inferior.
+
+PROCESSO OBRIGATÓRIO (Passo a Passo):
+1. ANÁLISE: Identifique a(s) peça(s) de roupa que a Pessoa Base está vestindo (ex: blusa, calça).
+2. REMOÇÃO: Remova DIGITALMENTE a(s) peça(s) de roupa original(is) correspondente(s) às novas peças fornecidas.`;
+
     if (top && bottom) {
-        clothingPrompt = 'com as peças de roupa superior e inferior fornecidas';
+        instruction += ` Remova a blusa/top e a calça/saia originais.`;
     } else if (top) {
-        clothingPrompt = 'com a peça de roupa superior fornecida';
+        instruction += ` Remova APENAS a blusa/top original.`;
     } else if (bottom) {
-        clothingPrompt = 'com a peça de roupa inferior fornecida';
-    } else {
-        throw new Error("At least one clothing item is required.");
+        instruction += ` Remova APENAS a calça/saia/shorts original.`;
     }
 
-    const fullPrompt = `Sua tarefa é criar uma imagem fotorrealista de "provador virtual". Use a imagem da pessoa fornecida como base principal. Seu objetivo é vestir perfeitamente essa pessoa ${clothingPrompt}.
+    instruction += ` É CRUCIAL que a roupa antiga seja 100% removida, não apenas coberta.
+3. RECONSTRUÇÃO: Recrie o corpo da pessoa que estava sob a roupa removida de forma realista.
+4. APLICAÇÃO: Vista a pessoa com a(s) nova(s) peça(s) de roupa. O caimento, a textura, as sombras e a iluminação devem parecer naturais no corpo da pessoa.
+5. PRESERVAÇÃO: Mantenha TODO O RESTO da imagem original INTACTO: o rosto da pessoa, cabelo, pele, pose, o fundo da imagem e qualquer roupa que não foi substituída.
 
-Instruções para a imagem final:
-1.  **Aplicação das Roupas**: Aplique realisticamente a(s) peça(s) de roupa na pessoa, prestando muita atenção ao caimento natural, dobras do tecido, textura e iluminação para garantir que as roupas pareçam estar realmente sendo usadas. Se apenas uma peça for fornecida (superior ou inferior), imagine uma peça complementar que combine bem (por exemplo, se um top for fornecido, adicione uma calça jeans ou saia neutra; se uma calça for fornecida, adicione uma camiseta branca simples). A peça fornecida deve ser o foco principal.
-2.  **Preservação**: É crucial manter a pose original da pessoa, sua forma corporal, estrutura facial e cabelo. Não altere suas características físicas.
-3.  **Fundo**: Substitua o fundo original por um fundo limpo e neutro.
-4.  **Retoque de Pele**: Aplique um retoque de pele leve e sutil para remover pequenas imperfeições e reduzir o brilho excessivo, visando um resultado natural.
-5.  **Resultado**: O resultado final deve ser apenas a imagem gerada.`;
+REGRAS FINAIS:
+- FIDELIDADE: As novas peças de roupa na imagem final devem ser idênticas às fornecidas.
+- NÃO SOBREPOR: NUNCA coloque a nova roupa por cima da roupa antiga. A roupa antiga DEVE desaparecer.
+- REALISMO: O resultado final deve parecer uma fotografia real.`;
+
 
     const parts: any[] = [
-        { text: fullPrompt },
-        { inlineData: { mimeType: 'image/jpeg', data: person } }
+        { text: instruction },
+        { inlineData: { mimeType: 'image/jpeg', data: person } } // Pessoa Base
     ];
     if (top) {
-        parts.push({ inlineData: { mimeType: 'image/jpeg', data: top } });
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: top } }); // Peça de Roupa
     }
     if (bottom) {
-        parts.push({ inlineData: { mimeType: 'image/jpeg', data: bottom } });
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: bottom } }); // Peça de Roupa
     }
 
     const response = await ai.models.generateContent({
@@ -64,12 +74,15 @@ Instruções para a imagem final:
 
 export const editImageWithText = async (baseImage: string, prompt: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const fullPrompt = `Atue como um editor de fotos profissional. Sua instrução de edição é: "${prompt}". Ao editar, mantenha a qualidade fotográfica, a iluminação e a identidade da pessoa na imagem. É crucial que você não distorça o rosto. Aplique apenas a alteração solicitada.`;
+
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
             parts: [
                 { inlineData: { mimeType: 'image/jpeg', data: baseImage } },
-                { text: prompt },
+                { text: fullPrompt },
             ],
         },
         config: {
