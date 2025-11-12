@@ -1,21 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { fileToBase64, generateLook, editImageWithText } from './services/geminiService';
+import { fileToBase64, generateLook, editImageWithText, fileToResizedDataUrl, dataUrlToResizedDataUrl } from './services/geminiService';
 import { VideoGenerator } from './components/VideoGenerator';
-
-// --- 1. Types ---
-type ImageData = {
-    file?: File;
-    url: string;
-};
-
-type SavedOutfit = {
-    id: number;
-    clientImageUrl: string;
-    topImageUrl: string | null;
-    bottomImageUrl: string | null;
-    generatedLookUrl: string;
-    generatedLookBase64: string;
-};
+import { ImageData, SavedOutfit } from './types';
 
 // --- 2. Helper Components ---
 
@@ -222,6 +208,7 @@ function App() {
             localStorage.setItem('savedOutfits', JSON.stringify(savedOutfits));
         } catch (error) {
             console.error("Failed to save outfits to localStorage", error);
+            alert("Erro: Não foi possível salvar o look. O armazenamento local pode estar cheio.");
         }
     }, [savedOutfits]);
     
@@ -292,29 +279,53 @@ function App() {
 
     // --- History Handlers ---
     const handleSaveOutfit = useCallback(async () => {
-        if (!clientImage?.url || (!topImage?.url && !bottomImage?.url) || !generatedLook || !generatedLookBase64) {
-            alert("Não é possível salvar o look...");
+        if (!clientImage?.file || (!topImage?.file && !bottomImage?.file) || !generatedLook) {
+            alert("Não é possível salvar. Certifique-se de que as imagens originais foram carregadas nesta sessão para salvar.");
             return;
         }
-        const newOutfit: SavedOutfit = {
-            id: Date.now(),
-            clientImageUrl: clientImage.url,
-            topImageUrl: topImage?.url ?? null,
-            bottomImageUrl: bottomImage?.url ?? null,
-            generatedLookUrl: generatedLook,
-            generatedLookBase64: generatedLookBase64,
-        };
-        setSavedOutfits(prev => [newOutfit, ...prev]);
-        alert("Look salvo!");
-    }, [clientImage, topImage, bottomImage, generatedLook, generatedLookBase64]);
+
+        try {
+            const MAX_DIM = 512;
+            const clientPromise = fileToResizedDataUrl(clientImage.file, MAX_DIM, MAX_DIM);
+            const topPromise = topImage?.file ? fileToResizedDataUrl(topImage.file, MAX_DIM, MAX_DIM) : Promise.resolve(null);
+            const bottomPromise = bottomImage?.file ? fileToResizedDataUrl(bottomImage.file, MAX_DIM, MAX_DIM) : Promise.resolve(null);
+            const generatedPromise = dataUrlToResizedDataUrl(generatedLook, MAX_DIM, MAX_DIM * 1.77); // Approx 16:9
+
+            const [clientImageUrl, topImageUrl, bottomImageUrl, generatedLookUrl] = await Promise.all([
+                clientPromise,
+                topPromise,
+                bottomPromise,
+                generatedPromise,
+            ]);
+
+            const newOutfit: SavedOutfit = {
+                id: Date.now(),
+                clientImageUrl,
+                topImageUrl,
+                bottomImageUrl,
+                generatedLookUrl,
+            };
+
+            setSavedOutfits(prev => [newOutfit, ...prev]);
+            alert("Look salvo!");
+
+        } catch (error) {
+            console.error("Falha ao redimensionar e salvar o look:", error);
+            alert("Ocorreu um erro ao salvar o look. As imagens podem ser muito grandes ou em um formato inválido.");
+        }
+    }, [clientImage, topImage, bottomImage, generatedLook]);
 
     const handleLoadOutfit = useCallback((outfit: SavedOutfit) => {
         setClientImage({ url: outfit.clientImageUrl });
         setTopImage(outfit.topImageUrl ? { url: outfit.topImageUrl } : null);
         setBottomImage(outfit.bottomImageUrl ? { url: outfit.bottomImageUrl } : null);
         setGeneratedLook(outfit.generatedLookUrl);
-        setGeneratedLookBase64(outfit.generatedLookBase64);
-        setVideoUrl(''); 
+        
+        if (outfit.generatedLookUrl.includes(',')) {
+            setGeneratedLookBase64(outfit.generatedLookUrl.split(',')[1]);
+        }
+        
+        setVideoUrl('');
         alert("Look carregado.");
         window.scrollTo(0, 0);
     }, []);
@@ -390,7 +401,7 @@ function App() {
                         <div id="post-actions" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <button onClick={() => setShowEditModal(true)} className="btn-secondary flex-1" disabled={!generatedLook}>Editar</button>
                             <button onClick={handleDownload} className="btn-secondary flex-1" disabled={!generatedLook}>Baixar</button>
-                            <button onClick={handleSaveOutfit} className="btn-secondary flex-1" disabled={!generatedLook || !clientImage || (!topImage && !bottomImage)}>Salvar</button>
+                            <button onClick={handleSaveOutfit} className="btn-secondary flex-1" disabled={!generatedLook || !clientImage?.file || (!topImage?.file && !bottomImage?.file)}>Salvar</button>
                         </div>
 
                          <VideoGenerator
