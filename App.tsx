@@ -6,8 +6,6 @@ type ImageData = {
     url: string;
 };
 
-type AppTab = 'dressingRoom' | 'imageGenerator';
-
 type SavedOutfit = {
     id: number;
     clientImageUrl: string;
@@ -41,15 +39,38 @@ const generateLook = async (
     const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
 
     const promptParts: any[] = [
-        { text: "Você é um assistente de provador virtual. Seu trabalho é aplicar as peças de roupa (superior e/ou inferior) fornecidas sobre a imagem da pessoa. Mantenha o rosto, cabelo e corpo da pessoa 100% intactos. O resultado deve ser fotorrealista, ajustando caimento, textura e iluminação. Retorne APENAS a imagem final." },
-        { inlineData: { mimeType: "image/jpeg", data: personB64.split(',')[1] } },
+        // --- NOVO PROMPT (INQUEBRÁVEL) ---
+        { text: `
+PERFIL: Motor de IA de Substituição de Vestuário (Virtual Try-On).
+
+TAREFA PRINCIPAL: SUBSTITUIÇÃO 1:1 (UM PARA UM).
+Você receberá uma 'IMAGEM ORIGINAL' (pessoa vestindo roupa A) e uma 'IMAGEM DE PRODUTO' (roupa B).
+Sua tarefa é gerar uma nova imagem onde a roupa A foi 100% REMOVIDA e a roupa B foi aplicada em seu lugar.
+
+**REGRA INQUEBRÁVEL (PROIBIDO SOBREPOR):**
+* A roupa original (ex: a 'blusa branca' da IMAGEM ORIGINAL) **NÃO PODE APARECER** na imagem final.
+* A IA deve entender o corpo da pessoa *por baixo* da roupa original.
+* **FALHA:** Colar a 'IMAGEM DE PRODUTO' por cima da roupa original é uma falha.
+
+**REGRA INQUEBRÁVEL (PROIBIDO INVENTAR):**
+* A 'IMAGEM DE PRODUTO' é a única fonte da verdade para a nova roupa.
+* **FIDELIDADE TOTAL:** A cor, textura, costura, e detalhes da roupa na IMAGEM FINAL devem ser **100% IDÊNTICOS** aos da 'IMAGEM DE PRODUTO'.
+* A IA não tem permissão para "harmonizar" iluminação se isso alterar a cor do produto.
+
+**REGRA DE PRESERVAÇÃO (NÃO CORTE):**
+* Preserve 100% o tom de pele, cabelo, rosto, pose e o fundo da 'IMAGEM ORIGINAL'.
+* O enquadramento NÃO PODE ser cortado.
+
+SAÍDA: Apenas a imagem final que obedece a TODAS as regras.
+        `},
+        { inlineData: { mimeType: "image/jpeg", data: personB64.split(',')[1] } }, // IMAGEM ORIGINAL
     ];
     if (topB64) {
-        promptParts.push({ text: "Peça superior para aplicar:" });
+        promptParts.push({ text: "IMAGEM DE PRODUTO (Superior para aplicar no tronco):" });
         promptParts.push({ inlineData: { mimeType: "image/jpeg", data: topB64.split(',')[1] } });
     }
     if (bottomB64) {
-        promptParts.push({ text: "Peça inferior para aplicar:" });
+        promptParts.push({ text: "IMAGEM DE PRODUTO (Inferior para aplicar nas pernas/quadril):" });
         promptParts.push({ inlineData: { mimeType: "image/jpeg", data: bottomB64.split(',')[1] } });
     }
 
@@ -67,7 +88,7 @@ const generateLook = async (
     if (!response.ok) {
         const errorText = await response.text();
         console.error("Erro da API Gemini:", errorText);
-        throw new Error(`Falha ao gerar look: ${response.statusText}`);
+        throw new Error(`Falha ao gerar look: ${errorText}`);
     }
 
     const result = await response.json();
@@ -96,8 +117,8 @@ const editImageWithText = async (
     const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
 
     const promptParts: any[] = [
-        { text: `Você é um editor de fotos. Aplique esta mudança na imagem: "${prompt}". Mantenha o resto da imagem o mais intacto possível.` },
-        { inlineData: { mimeType: "image/jpeg", data: imageBase64.split(',')[1] } },
+        { text: `Atue como um editor de fotos profissional. Instrução de edição: "${prompt}". Mantenha a qualidade fotográfica, a iluminação e a identidade da pessoa. Não distorça o rosto.` },
+        { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
     ];
 
     const response = await fetch(`${API_URL}?key=${apiKey}`, {
@@ -132,16 +153,6 @@ const editImageWithText = async (
     throw new Error("A resposta da API (edição) não continha dados de imagem válidos.");
 };
 
-// --- FUNÇÃO MOCK (SIMULADA) (generateImageFromPrompt - Google Gemini) ---
-const generateImageFromPrompt = async (prompt: string): Promise<string[]> => {
-    console.log("Mock API: Gerando imagem com prompt:", prompt);
-    await sleep(1500);
-    const response = await fetch(`https://placehold.co/512x512/374151/ca8a04?text=Mock:${encodeURI(prompt.slice(0, 20))}`);
-    const blob = await response.blob();
-    const base64 = await fileToBase64(blob as File);
-    return [base64.split(',')[1]];
-};
-
 // --- MUDANÇA: Voltamos para a SIMULAÇÃO de vídeo ---
 /**
  * Simula a geração do vídeo (já que a API do Stability não está acessível)
@@ -170,24 +181,10 @@ const LoadingSpinner: React.FC = () => (
     </div>
 );
 
-const AppHeader: React.FC<{ activeTab: AppTab; onTabChange: (tab: AppTab) => void; }> = ({ activeTab, onTabChange }) => (
+const AppHeader: React.FC = () => (
     <header className="bg-gray-800 border-b-2 border-amber-500 p-4 sticky top-0 z-20">
-        <div className="w-full max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center">
+        <div className="w-full max-w-5xl mx-auto flex flex-col sm:flex-row justify-center items-center">
             <h1 className="text-3xl font-bold text-amber-300 tracking-tight">Provador Digital<span className="text-teal-400">.AI</span></h1>
-            <nav className="flex space-x-2 mt-4 sm:mt-0 bg-gray-900 p-1 rounded-lg">
-                <button
-                    onClick={() => onTabChange('dressingRoom')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === 'dressingRoom' ? 'bg-teal-600 text-white shadow' : 'text-gray-400 hover:bg-gray-700'}`}
-                >
-                    Provador
-                </button>
-                <button
-                    onClick={() => onTabChange('imageGenerator')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === 'imageGenerator' ? 'bg-teal-600 text-white shadow' : 'text-gray-400 hover:bg-gray-700'}`}
-                >
-                    Gerador de Imagem
-                </button>
-            </nav>
         </div>
     </header>
 );
@@ -204,6 +201,20 @@ interface ImageUploaderProps {
 const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImageUpload, previewUrl, placeholderText, aspectRatio = 'square' }) => {
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // --- MUDANÇA AQUI ---
+    // Adiciona um useEffect para observar o previewUrl
+    useEffect(() => {
+        // Se o previewUrl for 'null' ou 'undefined' (o que acontece ao "Limpar")
+        // E o ref do input existir...
+        if (!previewUrl && fileInputRef.current) {
+            // ...nós resetamos o valor interno do input.
+            // Isso corrige o bug onde o navegador não dispara o evento 'change'
+            // se o usuário tentar enviar a *mesma* imagem novamente.
+            fileInputRef.current.value = "";
+        }
+    }, [previewUrl]); // O 'useEffect' roda toda vez que 'previewUrl' muda
+    // --- FIM DA MUDANÇA ---
 
     const handleFile = (file: File) => {
         if (file && file.type.startsWith('image/')) {
@@ -322,7 +333,7 @@ interface HistoryPanelProps {
 }
 
 const HistoryPanel: React.FC<HistoryPanelProps> = ({ outfits, onLoad, onDelete }) => (
-    <div className="panel">
+    <div className="panel p-4 md:p-6">
         <h2 className="text-xl font-semibold text-amber-400 mb-4">Looks Salvos</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {outfits.map(outfit => (
@@ -341,8 +352,6 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ outfits, onLoad, onDelete }
 
 // --- 4. Main App Component ---
 function App() {
-    const [activeTab, setActiveTab] = useState<AppTab>('dressingRoom');
-
     // --- States de Vídeo ---
     const [videoUrl, setVideoUrl] = useState('');
     const [isVideoLoading, setIsVideoLoading] = useState(false);
@@ -362,11 +371,6 @@ function App() {
     const [isEditing, setIsEditing] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
-
-    // Image Generator State
-    const [prompt, setPrompt] = useState('');
-    const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     
     // --- LocalStorage Effects for Persistence ---
     useEffect(() => {
@@ -402,14 +406,14 @@ function App() {
     // Pede a API Key do Google
     const getGoogleApiKey = (): string | null => {
         if (googleApiKey) return googleApiKey;
-        const key = window.prompt("Por favor, insira sua API Key do GOOGLE AI Studio:");
-        if(key) {
-            handleGoogleApiKeyChange(key);
-            return key;
-        } else {
-             alert('API Key do Google é necessária para esta ação.');
-             return null;
-        }
+
+        // --- MUDANÇA AQUI ---
+        // Removemos o window.prompt(). 
+        // Agora, se a chave não estiver no estado, nós apenas avisamos
+        // o usuário para preenchê-la no campo de input principal.
+        
+        alert('API Key do Google é necessária. Por favor, insira no campo "Google AI API Key" no topo da página.');
+        return null;
     }
 
 
@@ -488,26 +492,17 @@ function App() {
             setIsVideoLoading(false);
         }
     };
-    
-    const handleGenerateImage = useCallback(async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!prompt.trim()) return;
-        setIsGeneratingImage(true);
-        setGeneratedImage(null);
-        try {
-            const results = await generateImageFromPrompt(prompt); // Usando mock
-            if (results.length > 0) {
-                setGeneratedImage(`data:image/jpeg;base64,${results[0]}`);
-            }
-        } catch (error)
-         {
-            console.error(error);
-            alert("Falha ao gerar a imagem. Veja o console para detalhes.");
-        } finally {
-            setIsGeneratingImage(false);
-        }
-    }, [prompt]);
 
+    // --- MUDANÇA: NOVA FUNÇÃO PARA LIMPAR A TELA ---
+    const handleClearScreen = useCallback(() => {
+        setClientImage(null);
+        setTopImage(null);
+        setBottomImage(null);
+        setGeneratedLook(null);
+        setGeneratedLookBase64(null);
+        setVideoUrl('');
+    }, []);
+    
     const handleDownload = () => {
         if (!generatedLook) return;
         const link = document.createElement('a');
@@ -555,29 +550,40 @@ function App() {
 
     const renderDressingRoom = () => (
         <div className="flex flex-col">
-            <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-                <div className="panel flex flex-col gap-4">
+            <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 md:p-6">
+                <div className="panel flex flex-col gap-4 p-4 md:p-6">
                     <h2 className="text-xl font-semibold text-amber-400">1. Imagem do Cliente</h2>
                     <ImageUploader id="cliente-img-input" label="" onImageUpload={setClientImage} previewUrl={clientImage?.url} placeholderText="Arraste ou clique para enviar a foto do cliente" aspectRatio="portrait" />
                 </div>
 
-                <div className="panel flex flex-col gap-4">
+                <div className="panel flex flex-col gap-4 p-4 md:p-6">
                     <h2 className="text-xl font-semibold text-amber-400">2. Itens de Vestuário</h2>
                     <div className="flex flex-col gap-4 flex-grow overflow-y-auto min-h-0">
                         <ImageUploader id="superior-img-input" label="Superior" onImageUpload={setTopImage} previewUrl={topImage?.url} placeholderText="Peça Superior" />
                         <ImageUploader id="inferior-img-input" label="Inferior" onImageUpload={setBottomImage} previewUrl={bottomImage?.url} placeholderText="Peça Inferior" />
                     </div>
-                    <button 
-                        id="criar-look-btn" 
-                        className="btn-primary w-full mt-auto" 
-                        onClick={handleCreateLook} 
-                        disabled={!clientImage?.file || (!topImage?.file && !bottomImage?.file) || isCreatingLook}
-                    >
-                        {isCreatingLook ? 'Criando Look...' : 'Criar Look'}
-                    </button>
+                    
+                    {/* --- MUDANÇA: Botões "Limpar" e "Criar Look" lado a lado --- */}
+                    <div className="flex gap-4 mt-auto">
+                        <button
+                            id="limpar-tela-btn"
+                            className="btn-secondary w-1/2"
+                            onClick={handleClearScreen}
+                        >
+                            Limpar
+                        </button>
+                        <button 
+                            id="criar-look-btn" 
+                            className="btn-primary w-1/2" 
+                            onClick={handleCreateLook} 
+                            disabled={!clientImage?.file || (!topImage?.file && !bottomImage?.file) || isCreatingLook}
+                        >
+                            {isCreatingLook ? 'Criando Look...' : 'Criar Look'}
+                        </button>
+                    </div>
                 </div>
                 
-                <div className="panel flex flex-col gap-4">
+                <div className="panel flex flex-col gap-4 p-4 md:p-6">
                     <h2 className="text-xl font-semibold text-amber-400">3. Resultado Gerado</h2>
                     <div id="resultado-container" className={`relative w-full bg-gray-700 rounded-lg flex items-center justify-center transition-all duration-300 ${aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-[16/9]'}`}>
                         {isCreatingLook && <LoadingSpinner />}
@@ -629,7 +635,7 @@ function App() {
                 </div>
             </div>
              {savedOutfits.length > 0 && (
-                 <div className="px-6 pb-6">
+                 <div className="px-4 md:px-6 pb-6">
                      <HistoryPanel
                          outfits={savedOutfits}
                          onLoad={handleLoadOutfit}
@@ -642,49 +648,12 @@ function App() {
             )}
         </div>
     );
-    
-    const renderImageGenerator = () => (
-        <div className="w-full max-w-5xl mx-auto p-6 flex flex-col items-center">
-            <div className="w-full max-w-2xl panel">
-                <h2 className="text-2xl font-bold text-amber-400 mb-4">Gerador de Imagem AI</h2>
-                <p className="text-gray-300 mb-6">Descreva a imagem que você quer criar. Seja detalhista para melhores resultados.</p>
-                <form onSubmit={handleGenerateImage} className="flex flex-col gap-4">
-                    <textarea
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Ex: Um astronauta andando a cavalo em marte, arte digital fotorrealista"
-                        className="w-full p-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow resize-none"
-                        rows={4}
-                        disabled={isGeneratingImage}
-                    />
-                    <button
-                        type="submit"
-                        className="btn-primary w-full"
-                        disabled={!prompt.trim() || isGeneratingImage}
-                    >
-                        {isGeneratingImage ? 'Gerando...' : 'Gerar Imagem'}
-                    </button>
-                </form>
-            </div>
-            <div className="mt-8 w-full max-w-2xl">
-                <h3 className="text-xl font-semibold text-amber-400 mb-4 text-center">Resultado</h3>
-                <div className="relative aspect-square bg-gray-700 rounded-lg flex items-center justify-center panel">
-                    {isGeneratingImage && <LoadingSpinner />}
-                    {generatedImage ? (
-                        <img src={generatedImage} alt="Imagem gerada" className="w-full h-full object-contain rounded-lg" />
-                    ) : (
-                        <p className="text-gray-400">A imagem gerada aparecerá aqui.</p>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
 
     return (
-        <div className="h-screen bg-gray-900 text-amber-300 flex flex-col">
+        <div className="min-h-screen bg-gray-900 text-amber-300 flex flex-col">
             <style>{`
                 /* Estilos Globais para Tailwind */
-                .panel { background-color: #1f2937; /* gray-800 */ border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
+                .panel { background-color: #1f2937; /* gray-800 */ border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
                 .btn-primary { background-color: #0d9488; /* teal-600 */ color: white; font-weight: 600; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: background-color 0.2s; }
                 .btn-primary:hover { background-color: #0f766e; /* teal-700 */ }
                 .btn-primary:disabled { background-color: #4b5563; /* gray-600 */ cursor: not-allowed; }
@@ -692,8 +661,8 @@ function App() {
                 .btn-secondary:hover { background-color: #374151; /* gray-700 */ }
                 .btn-secondary:disabled { background-color: #374151; /* gray-700 */ color: #6b7280; /* gray-500 */ cursor: not-allowed; }
             `}</style>
-            <AppHeader activeTab={activeTab} onTabChange={setActiveTab} />
-            <main className="flex-grow overflow-y-auto">
+            <AppHeader />
+            <main className="flex-grow">
                 <div className="w-full max-w-5xl mx-auto p-4">
                     {/* --- MUDANÇA: Apenas uma chave de API --- */}
                     <div>
@@ -708,7 +677,7 @@ function App() {
                         />
                     </div>
                 </div>
-                {activeTab === 'dressingRoom' ? renderDressingRoom() : renderImageGenerator()}
+                {renderDressingRoom()}
             </main>
         </div>
     );
