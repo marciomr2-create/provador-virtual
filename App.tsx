@@ -11,9 +11,9 @@ import { HistoryPanel } from './components/HistoryPanel';
 import { ImageData, SavedOutfit } from './types';
 
 const LoadingOverlay: React.FC<{ message: string }> = ({ message }) => (
-    <div className="absolute inset-0 bg-[#0a0a0b]/90 backdrop-blur-md flex flex-col items-center justify-center rounded-xl z-50 border border-[#D4AF37]/20">
+    <div className="absolute inset-0 bg-[#0a0a0b]/90 backdrop-blur-md flex flex-col items-center justify-center rounded-xl z-50 border border-[#D4AF37]/20 px-6 text-center">
         <div className="w-16 h-16 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mb-6"></div>
-        <p className="text-[#D4AF37] font-bold animate-pulse text-center px-6 tracking-widest uppercase text-xs leading-relaxed">{message}</p>
+        <p className="text-[#D4AF37] font-bold animate-pulse tracking-widest uppercase text-[10px] leading-relaxed max-w-[200px]">{message}</p>
     </div>
 );
 
@@ -24,7 +24,7 @@ const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
                 <h1 className="text-4xl font-black text-[#D4AF37] tracking-tighter italic">
                     VOFY
                 </h1>
-                <span className="text-[10px] text-[#FDFBF7]/60 font-bold uppercase tracking-[0.3em] -mt-1">Provador Digital de Alta Fidelidade</span>
+                <span className="text-[10px] text-[#FDFBF7]/60 font-bold uppercase tracking-[0.3em] -mt-1">Ateliê de Alta Costura Digital</span>
             </div>
             <div className="flex gap-4 items-center">
                  <button 
@@ -34,19 +34,13 @@ const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
                     <svg className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     <span className="text-[11px] font-black uppercase tracking-[0.15em]">LIMPAR TUDO</span>
                  </button>
-                 <div className="px-4 py-2 bg-[#161618] rounded-full border border-[#27272a] hidden sm:block">
-                    <p className="text-[#FDFBF7]/60 text-[10px] font-bold tracking-widest uppercase">
-                        Motor: <span className="text-[#D4AF37]">Pro 6.0 Stable</span>
-                    </p>
-                 </div>
             </div>
         </div>
     </header>
 );
 
 export default function App() {
-    const { isKeySelected } = useApiKey();
-
+    const { isKeySelected, selectKey } = useApiKey();
     const [clientImage, setClientImage] = useState<ImageData | null>(null);
     const [topImage, setTopImage] = useState<ImageData | null>(null);
     const [bottomImage, setBottomImage] = useState<ImageData | null>(null);
@@ -57,6 +51,7 @@ export default function App() {
     
     const [generatedLook, setGeneratedLook] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [errorState, setErrorState] = useState<'NONE' | 'QUOTA' | 'AUTH' | 'GENERIC'>('NONE');
     const [loadingMessage, setLoadingMessage] = useState('');
     const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
 
@@ -69,44 +64,27 @@ export default function App() {
         localStorage.setItem('vofy_history_v1', JSON.stringify(savedOutfits));
     }, [savedOutfits]);
 
-    const revokeUrls = useCallback((...images: (ImageData | null | string)[]) => {
-        images.forEach(img => {
-            if (img && typeof img === 'object' && img.url && img.url.startsWith('blob:')) {
-                URL.revokeObjectURL(img.url);
-            }
-        });
-    }, []);
-
-    const handleTrialReset = useCallback(() => {
-        revokeUrls(topImage, bottomImage, fullBodyImage);
-        setTopImage(null);
-        setBottomImage(null);
-        setFullBodyImage(null);
-        setGeneratedLook(null);
-        setClothingResetKey(k => k + 1);
-        document.getElementById('clothing-selection')?.scrollIntoView({ behavior: 'smooth' });
-    }, [topImage, bottomImage, fullBodyImage, revokeUrls]);
-
     const handleGlobalReset = useCallback(() => {
-        revokeUrls(clientImage, topImage, bottomImage, fullBodyImage);
         setClientImage(null);
         setTopImage(null);
         setBottomImage(null);
         setFullBodyImage(null);
         setGeneratedLook(null);
+        setErrorState('NONE');
         setClientResetKey(k => k + 1);
         setClothingResetKey(k => k + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, [clientImage, topImage, bottomImage, fullBodyImage, revokeUrls]);
+    }, []);
 
     const handleCreateLook = async () => {
         if (!clientImage || (!topImage && !bottomImage && !fullBodyImage)) {
-            alert("Selecione sua foto base e as peças que deseja provar.");
+            alert("Selecione sua foto base e as roupas.");
             return;
         }
         
         setIsProcessing(true);
-        setLoadingMessage('Consultando Ateliê Digital...');
+        setErrorState('NONE');
+        setLoadingMessage('Executando Costura Digital...');
 
         try {
             const getB64 = async (img: ImageData | null) => {
@@ -120,162 +98,129 @@ export default function App() {
             const bottomB64 = await getB64(bottomImage);
             const fullBodyB64 = await getB64(fullBodyImage);
 
-            if (!personB64) throw new Error("Imagem base inválida.");
-
-            const resultB64 = await generateLook(personB64, topB64, bottomB64, fullBodyB64);
+            const resultB64 = await generateLook(personB64!, topB64, bottomB64, fullBodyB64);
             setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
         } catch (error: any) {
-            // Exibição amigável do erro
-            alert(error.message);
+            if (error.message === 'QUOTA_EXCEEDED') setErrorState('QUOTA');
+            else if (error.message === 'AUTH_REQUIRED') setErrorState('AUTH');
+            else setErrorState('GENERIC');
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const handleSaveOutfit = async () => {
-        if (!generatedLook) return;
-        setIsProcessing(true);
-        setLoadingMessage('Salvando Look...');
-        try {
-            const thumb = await resizeImageDataUrl(generatedLook, 600, 800);
-            const newOutfit: SavedOutfit = {
-                id: Date.now(),
-                clientImageUrl: clientImage?.url || '',
-                topImageUrl: topImage?.url || null,
-                bottomImageUrl: bottomImage?.url || null,
-                fullBodyImageUrl: fullBodyImage?.url || null,
-                generatedLookUrl: thumb
-            };
-            setSavedOutfits([newOutfit, ...savedOutfits.slice(0, 19)]);
-        } catch (e) {
-            alert("Não foi possível salvar.");
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+    // TELA DE ACESSO AO ATELIÊ (PARA LIBERAR O MOTOR PRO)
+    if (!isKeySelected) {
+        return (
+            <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center p-6 text-center">
+                <div className="max-w-md w-full bg-[#161618] border border-[#D4AF37]/30 p-12 rounded-[2rem] shadow-2xl animate-in zoom-in duration-700">
+                    <h1 className="text-5xl font-black text-[#D4AF37] italic mb-2 tracking-tighter">VOFY</h1>
+                    <p className="text-[#FDFBF7]/40 text-[10px] uppercase tracking-[0.4em] mb-12">Provador de Luxo</p>
+                    <p className="text-[#FDFBF7]/60 text-sm mb-12 leading-relaxed">
+                        Bem-vindo ao Ateliê. Para utilizar nosso motor de <span className="text-[#D4AF37]">Alta Fidelidade PRO</span>, clique no botão abaixo para autorizar o acesso.
+                    </p>
+                    <button 
+                        onClick={selectKey}
+                        className="btn-primary w-full py-5 text-lg shadow-[0_0_50px_rgba(212,175,55,0.2)]"
+                    >
+                        ACESSAR ATELIÊ
+                    </button>
+                    <p className="mt-8 text-[9px] text-[#FDFBF7]/20 uppercase tracking-widest">Tecnologia Gemini 3 Pro</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0b] text-[#FDFBF7] selection:bg-[#D4AF37]/30 font-sans pb-32">
+        <div className="min-h-screen bg-[#0a0a0b] text-[#FDFBF7] font-sans pb-32">
             <AppHeader onReset={handleGlobalReset} />
             
             <main className="max-w-7xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Controles */}
                 <div className="lg:col-span-4 space-y-6">
-                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl backdrop-blur-sm">
-                        <h2 className="text-xl font-bold text-[#D4AF37] mb-6 flex items-center gap-3">
-                            <span className="bg-[#D4AF37] text-black w-7 h-7 flex items-center justify-center rounded-full text-xs font-black">1</span>
-                            Sua Foto Base
+                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl">
+                        <h2 className="text-xl font-bold text-[#D4AF37] mb-6 flex items-center gap-3 italic">
+                            1. Sua Foto
                         </h2>
                         <ImageUploader 
                             key={`client-${clientResetKey}`}
                             id="client-up" 
                             label="" 
-                            placeholderText="Foto de corpo inteiro" 
+                            placeholderText="Foto Base" 
                             onImageUpload={setClientImage} 
                             previewUrl={clientImage?.url} 
                             aspectRatio="portrait"
                         />
                     </section>
 
-                    <section id="clothing-selection" className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl backdrop-blur-sm">
-                        <h2 className="text-xl font-bold text-[#D4AF37] mb-6 flex items-center gap-3">
-                            <span className="bg-[#D4AF37] text-black w-7 h-7 flex items-center justify-center rounded-full text-xs font-black">2</span>
-                            Vestuário
+                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl">
+                        <h2 className="text-xl font-bold text-[#D4AF37] mb-6 flex items-center gap-3 italic">
+                            2. Peças
                         </h2>
                         <div className="space-y-6">
-                            <div className={`p-4 bg-black/40 rounded-2xl border transition-all ${fullBodyImage ? 'border-[#D4AF37]/50' : 'border-[#27272a]'}`}>
-                                <ImageUploader 
-                                    key={`full-${clothingResetKey}`}
-                                    id="full-up" 
-                                    label="Peça Única" 
-                                    placeholderText="Vestido ou Macacão" 
-                                    onImageUpload={(img) => { setTopImage(null); setBottomImage(null); setFullBodyImage(img); }} 
-                                    previewUrl={fullBodyImage?.url}
-                                    aspectRatio="portrait"
-                                />
-                            </div>
+                            <ImageUploader 
+                                key={`full-${clothingResetKey}`}
+                                id="full-up" 
+                                label="VESTIDO / MACACÃO" 
+                                placeholderText="Peça Única" 
+                                onImageUpload={(img) => { setTopImage(null); setBottomImage(null); setFullBodyImage(img); }} 
+                                previewUrl={fullBodyImage?.url}
+                                aspectRatio="portrait"
+                            />
                             
-                            <div className={`p-4 bg-black/40 rounded-2xl border transition-all ${topImage || bottomImage ? 'border-[#D4AF37]/50' : 'border-[#27272a]'}`}>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <ImageUploader 
-                                        key={`top-${clothingResetKey}`}
-                                        id="top-up" 
-                                        label="Superior" 
-                                        placeholderText="Blusa" 
-                                        onImageUpload={(img) => { setFullBodyImage(null); setTopImage(img); }} 
-                                        previewUrl={topImage?.url}
-                                    />
-                                    <ImageUploader 
-                                        key={`bottom-${clothingResetKey}`}
-                                        id="bottom-up" 
-                                        label="Inferior" 
-                                        placeholderText="Calça/Saia" 
-                                        onImageUpload={(img) => { setFullBodyImage(null); setBottomImage(img); }} 
-                                        previewUrl={bottomImage?.url}
-                                    />
-                                </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <ImageUploader id="top-up" label="SUP" placeholderText="Blusa" onImageUpload={(img) => { setFullBodyImage(null); setTopImage(img); }} previewUrl={topImage?.url} />
+                                <ImageUploader id="bot-up" label="INF" placeholderText="Calça" onImageUpload={(img) => { setFullBodyImage(null); setBottomImage(img); }} previewUrl={bottomImage?.url} />
                             </div>
                         </div>
 
                         <button 
                             onClick={handleCreateLook}
                             disabled={isProcessing || !clientImage}
-                            className="w-full mt-8 btn-primary py-5 text-lg shadow-2xl relative overflow-hidden group border-none"
+                            className="w-full mt-8 btn-primary py-5 text-lg shadow-2xl group relative overflow-hidden"
                         >
-                            <span className="relative z-10">{isProcessing ? 'PROCESSANDO...' : 'EXECUTAR PROVA REAL'}</span>
-                            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                            <span className="relative z-10">{isProcessing ? 'GERANDO LOOK...' : 'EXECUTAR PROVA PRO'}</span>
                         </button>
                     </section>
                 </div>
 
+                {/* Resultado */}
                 <div className="lg:col-span-8 space-y-6">
-                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl min-h-[600px] flex flex-col relative overflow-hidden backdrop-blur-sm">
-                        <div className="relative flex-grow bg-black/80 rounded-2xl overflow-hidden border border-[#27272a] flex items-center justify-center min-h-[500px]">
+                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl min-h-[650px] flex flex-col relative overflow-hidden">
+                        <div className="relative flex-grow bg-black/80 rounded-2xl overflow-hidden border border-[#27272a] flex items-center justify-center min-h-[550px]">
                             {isProcessing && <LoadingOverlay message={loadingMessage} />}
                             
-                            {generatedLook ? (
-                                <img src={generatedLook} alt="Look Gerado" className="max-w-full max-h-[750px] object-contain shadow-2xl animate-in fade-in zoom-in duration-1000" />
-                            ) : (
-                                <div className="text-[#FDFBF7]/20 text-center p-12 flex flex-col items-center">
-                                    <div className="w-20 h-20 mb-6 bg-black/40 border-2 border-[#27272a] rounded-full flex items-center justify-center">
-                                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M12 4v16m8-8H4"></path></svg>
-                                    </div>
-                                    <p className="font-black uppercase tracking-[0.4em] text-[10px]">Aguardando Criação</p>
+                            {errorState === 'AUTH' && (
+                                <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
+                                    <h3 className="text-[#D4AF37] font-black mb-4 uppercase">Sessão Expirada</h3>
+                                    <button onClick={selectKey} className="btn-primary px-8 py-3">REATIVAR ATELIÊ</button>
                                 </div>
                             )}
+
+                            {errorState === 'QUOTA' && (
+                                <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
+                                    <h3 className="text-[#D4AF37] font-black mb-4 uppercase tracking-widest">Muitos Pedidos</h3>
+                                    <p className="text-xs text-[#FDFBF7]/60 mb-8 max-w-[250px]">O Ateliê Pro está atendendo muitos convidados. Tente novamente em 60 segundos.</p>
+                                    <button onClick={handleCreateLook} className="btn-primary px-8 py-3">TENTAR NOVAMENTE</button>
+                                </div>
+                            )}
+
+                            {generatedLook ? (
+                                <img src={generatedLook} alt="Look Final" className="max-w-full max-h-[800px] object-contain shadow-2xl animate-in fade-in duration-1000" />
+                            ) : !isProcessing && errorState === 'NONE' ? (
+                                <div className="text-center p-12 opacity-10">
+                                    <p className="font-black uppercase tracking-[0.5em] text-[12px]">Seu Ateliê Digital</p>
+                                </div>
+                            ) : null}
                         </div>
 
-                        {generatedLook && (
-                            <div className="animate-in slide-in-from-bottom-8 duration-700 mt-8">
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <button 
-                                        onClick={handleTrialReset} 
-                                        className="py-4 px-6 bg-black hover:bg-red-950/20 hover:text-red-400 transition-colors border border-[#27272a] rounded-2xl font-black text-[10px] uppercase tracking-widest"
-                                    >
-                                        Limpar Tela
-                                    </button>
-                                    <button onClick={handleSaveOutfit} className="py-4 px-6 bg-black hover:bg-[#18181b] transition-colors border border-[#27272a] rounded-2xl font-black text-[10px] uppercase tracking-widest">Salvar no Acervo</button>
-                                    <a href={generatedLook} download="vofy-look.jpg" className="btn-primary py-4 text-center font-black rounded-2xl flex items-center justify-center gap-2">
-                                        Exportar HD
-                                    </a>
-                                </div>
+                        {generatedLook && errorState === 'NONE' && (
+                            <div className="mt-8 grid grid-cols-2 gap-4">
+                                <button onClick={handleGlobalReset} className="py-4 bg-black border border-[#27272a] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-950/20">Novo Look</button>
+                                <a href={generatedLook} download="vofy-pro.jpg" className="btn-primary py-4 text-center rounded-2xl font-black">EXPORTAR HD</a>
                             </div>
                         )}
                     </section>
-                    
-                    {savedOutfits.length > 0 && (
-                        <HistoryPanel 
-                            outfits={savedOutfits} 
-                            onLoad={(outfit) => {
-                                setClientImage({ url: outfit.clientImageUrl });
-                                setTopImage(outfit.topImageUrl ? { url: outfit.topImageUrl } : null);
-                                setBottomImage(outfit.bottomImageUrl ? { url: outfit.bottomImageUrl } : null);
-                                setFullBodyImage(outfit.fullBodyImageUrl ? { url: outfit.fullBodyImageUrl } : null);
-                                setGeneratedLook(outfit.generatedLookUrl);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }} 
-                            onDelete={(id) => setSavedOutfits(s => s.filter(o => o.id !== id))} 
-                        />
-                    )}
                 </div>
             </main>
         </div>

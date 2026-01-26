@@ -14,8 +14,8 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 /**
- * MOTOR DE PROVADOR VOFY - VERSÃO MVP COMPATÍVEL
- * Configurado para lidar com alta demanda e limites de cota de forma elegante.
+ * MOTOR VOFY PRO - ALTA FIDELIDADE
+ * Especializado em substituição total de tecidos (Try-on Profissional).
  */
 export const generateLook = async (
     personBase64: string, 
@@ -23,51 +23,48 @@ export const generateLook = async (
     bottomBase64: string | null,
     fullBodyBase64: string | null
 ): Promise<string> => {
-    // Instanciação no momento da chamada garantindo uso da chave de ambiente
+    // Instanciação imediata para capturar a chave ativa (obrigatório para o modelo Pro)
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const parts: any[] = [];
 
+    // Foto Base
     parts.push({ 
         inlineData: { mimeType: 'image/jpeg', data: personBase64 },
     });
 
-    let specializedInstruction = "";
-    
+    // Peças de Referência
     if (fullBodyBase64) {
         parts.push({ inlineData: { mimeType: 'image/jpeg', data: fullBodyBase64 } });
-        specializedInstruction = `
-            TASK: TOTAL_REPLACEMENT
-            - Peça única (VESTIDO/MACACÃO).
-            - Substitua a roupa atual mantendo a anatomia.
-        `;
     } else {
         if (topBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: topBase64 } });
         if (bottomBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: bottomBase64 } });
-        
-        specializedInstruction = `
-            TASK: MODULAR_PLACEMENT
-            - Substitua as partes correspondentes (superior/inferior).
-        `;
     }
 
+    // PROMPT DE ALTA COSTURA - FOCO EM SUBSTITUIÇÃO TOTAL
     const masterPrompt = `
-        VOCÊ É O MOTOR VOFY (IA DE ALTA MODA).
-        OBJETIVO: Virtual Try-On realista.
-        PRESERVE: Rosto, tom de pele, cabelo e fundo.
-        AJUSTE: Caimento natural e iluminação coerente.
-        ${specializedInstruction}
+        YOU ARE THE VOFY PROFESSIONAL FASHION ENGINE.
+        TASK: HIGH-FIDELITY VIRTUAL TRY-ON.
+        
+        STRICT RULES:
+        1. CLOTHING REPLACEMENT: Completely REMOVE the original clothes from the person. 
+        2. NO LAYERING: Do not put new clothes over old ones (e.g., never put shorts over pants). The person should only be wearing the NEW items provided.
+        3. ANATOMY PRESERVATION: Maintain face, skin tone, hair, and body shape perfectly.
+        4. BACKGROUND INTEGRITY: Keep the exact same background and environment.
+        5. SEAMLESS FIT: Adjust the fabric drapes and shadows to match the person's pose and current lighting.
     `;
 
     parts.push({ text: masterPrompt });
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
+            // Upgrade para o modelo Pro para máxima responsividade ao prompt
+            model: 'gemini-3-pro-image-preview',
             contents: { parts },
             config: {
                 imageConfig: {
-                    aspectRatio: "3:4"
+                    aspectRatio: "3:4",
+                    imageSize: "1K"
                 }
             }
         });
@@ -79,15 +76,13 @@ export const generateLook = async (
         throw new Error("EMPTY_RESPONSE");
     } catch (err: any) {
         const errorMsg = err?.message || "";
-        
-        // Detecção de erro de cota (429 - Too Many Requests / Quota Exceeded)
-        if (errorMsg.toLowerCase().includes("quota") || errorMsg.includes("429")) {
-            throw new Error("O Ateliê VOFY está com lotação máxima de convidados VIP. Por favor, aguarde 60 segundos e tente sua prova novamente.");
+        if (errorMsg.includes("429") || errorMsg.toLowerCase().includes("quota")) {
+            throw new Error("QUOTA_EXCEEDED");
         }
-        
-        // Outros erros
-        console.error("VOFY_LOG: Service Exception");
-        throw new Error("O servidor de alta costura está processando muitos pedidos. Tente novamente em um instante.");
+        if (errorMsg.includes("403") || errorMsg.toLowerCase().includes("permission")) {
+            throw new Error("AUTH_REQUIRED");
+        }
+        throw new Error("SERVICE_UNAVAILABLE");
     }
 };
 
