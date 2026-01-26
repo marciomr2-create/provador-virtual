@@ -21,10 +21,11 @@ const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
     <header className="bg-[#050505] border-b border-[#27272a] p-6 sticky top-0 z-[100] shadow-2xl">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col">
-                <h1 className="text-4xl font-black text-[#D4AF37] tracking-tighter italic">
+                <h1 className="text-4xl font-black text-[#D4AF37] tracking-tighter italic flex items-baseline">
                     VOFY
+                    <span className="text-[12px] font-normal not-italic lowercase tracking-normal ml-2 opacity-50">(mvp)</span>
                 </h1>
-                <span className="text-[10px] text-[#FDFBF7]/60 font-bold uppercase tracking-[0.3em] -mt-1">Ateliê de Alta Costura Digital</span>
+                <span className="text-[10px] text-[#FDFBF7]/60 font-bold uppercase tracking-[0.3em] -mt-1">Provador Digital de Alta Performance</span>
             </div>
             <div className="flex gap-4 items-center">
                  <button 
@@ -114,7 +115,10 @@ export default function App() {
         return (
             <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center p-6 text-center">
                 <div className="max-w-md w-full bg-[#161618] border border-[#D4AF37]/30 p-12 rounded-[2rem] shadow-2xl animate-in zoom-in duration-700">
-                    <h1 className="text-5xl font-black text-[#D4AF37] italic mb-2 tracking-tighter">VOFY</h1>
+                    <h1 className="text-5xl font-black text-[#D4AF37] italic mb-2 tracking-tighter flex items-baseline justify-center">
+                        VOFY
+                        <span className="text-[14px] font-normal not-italic lowercase tracking-normal ml-3 opacity-40">(mvp)</span>
+                    </h1>
                     <p className="text-[#FDFBF7]/40 text-[10px] uppercase tracking-[0.4em] mb-12">Provador de Luxo</p>
                     <p className="text-[#FDFBF7]/60 text-sm mb-12 leading-relaxed">
                         Bem-vindo ao Ateliê. Para utilizar nosso motor de <span className="text-[#D4AF37]">Alta Fidelidade PRO</span>, clique no botão abaixo para autorizar o acesso.
