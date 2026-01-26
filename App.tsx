@@ -8,7 +8,6 @@ import {
 import { useApiKey } from './hooks/useApiKey';
 import { ImageUploader } from './components/ImageUploader';
 import { HistoryPanel } from './components/HistoryPanel';
-import { VideoGenerator } from './components/VideoGenerator';
 import { ImageData, SavedOutfit } from './types';
 
 const LoadingOverlay: React.FC<{ message: string }> = ({ message }) => (
@@ -62,7 +61,6 @@ export default function App() {
     // Estados de Resultado
     const [generatedLook, setGeneratedLook] = useState<string | null>(null);
     const [generatedLookBase64, setGeneratedLookBase64] = useState<string | null>(null);
-    const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
     
     const [isProcessing, setIsProcessing] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('');
@@ -89,8 +87,8 @@ export default function App() {
 
     // FUNÇÃO DE LIMPEZA DO RESULTADO (MANTÉM FOTO BASE)
     const handleTrialReset = useCallback(() => {
-        // Liberar memória apenas das roupas e resultados
-        revokeUrls(topImage, bottomImage, fullBodyImage, generatedVideoUrl);
+        // Liberar memória apenas das roupas
+        revokeUrls(topImage, bottomImage, fullBodyImage);
         
         // Limpar apenas vestuário e resultados
         setTopImage(null);
@@ -98,7 +96,6 @@ export default function App() {
         setFullBodyImage(null);
         setGeneratedLook(null);
         setGeneratedLookBase64(null);
-        setGeneratedVideoUrl(null);
         
         // Forçar destruição e recriação APENAS dos componentes de vestuário
         setClothingResetKey(k => k + 1);
@@ -106,11 +103,11 @@ export default function App() {
         // Scroll para a área de seleção de roupas
         const el = document.getElementById('clothing-selection');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }, [topImage, bottomImage, fullBodyImage, generatedVideoUrl, revokeUrls]);
+    }, [topImage, bottomImage, fullBodyImage, revokeUrls]);
 
     // FUNÇÃO DE LIMPEZA GLOBAL (HARD RESET - TUDO)
     const handleGlobalReset = useCallback(() => {
-        revokeUrls(clientImage, topImage, bottomImage, fullBodyImage, generatedVideoUrl);
+        revokeUrls(clientImage, topImage, bottomImage, fullBodyImage);
         
         setClientImage(null);
         setTopImage(null);
@@ -118,13 +115,12 @@ export default function App() {
         setFullBodyImage(null);
         setGeneratedLook(null);
         setGeneratedLookBase64(null);
-        setGeneratedVideoUrl(null);
         
         setClientResetKey(k => k + 1);
         setClothingResetKey(k => k + 1);
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, [clientImage, topImage, bottomImage, fullBodyImage, generatedVideoUrl, revokeUrls]);
+    }, [clientImage, topImage, bottomImage, fullBodyImage, revokeUrls]);
 
     const getB64 = async (img: ImageData | null): Promise<string | null> => {
         if (!img) return null;
@@ -158,10 +154,6 @@ export default function App() {
         
         setIsProcessing(true);
         setLoadingMessage('Renderizando pixels Pro 6.0...');
-        if (generatedVideoUrl) {
-            revokeUrls(generatedVideoUrl);
-            setGeneratedVideoUrl(null);
-        }
 
         try {
             const personB64 = await getB64(clientImage);
@@ -326,21 +318,6 @@ export default function App() {
                                         Baixar JPG
                                     </a>
                                 </div>
-
-                                <div className="mt-10 pt-10 border-t border-gray-800">
-                                    <h3 className="text-sm font-black text-amber-400 uppercase tracking-[0.2em] mb-6">Simulação em Vídeo</h3>
-                                    <VideoGenerator 
-                                        imageBase64={generatedLookBase64}
-                                        aspectRatio="9:16"
-                                        onVideoGenerated={setGeneratedVideoUrl}
-                                        onGenerationStateChange={() => {}}
-                                    />
-                                    {generatedVideoUrl && (
-                                        <div className="mt-6 bg-black rounded-3xl overflow-hidden border border-teal-500/30 shadow-2xl relative">
-                                            <video src={generatedVideoUrl} controls className="w-full h-auto" />
-                                        </div>
-                                    )}
-                                </div>
                             </div>
                         )}
                     </section>
@@ -349,7 +326,7 @@ export default function App() {
                         <HistoryPanel 
                             outfits={savedOutfits} 
                             onLoad={(outfit) => {
-                                revokeUrls(clientImage, topImage, bottomImage, fullBodyImage, generatedVideoUrl);
+                                revokeUrls(clientImage, topImage, bottomImage, fullBodyImage);
                                 setClientImage({ url: outfit.clientImageUrl });
                                 setTopImage(outfit.topImageUrl ? { url: outfit.topImageUrl } : null);
                                 setBottomImage(outfit.bottomImageUrl ? { url: outfit.bottomImageUrl } : null);
