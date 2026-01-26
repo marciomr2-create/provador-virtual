@@ -14,8 +14,8 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 /**
- * MOTOR DE PROVADOR VOFY 6.0 - PRO REASONING
- * Implementação segura usando process.env.API_KEY (Server-side injected)
+ * MOTOR DE PROVADOR VOFY - VERSÃO MVP COMPATÍVEL
+ * Configurado para lidar com alta demanda e limites de cota de forma elegante.
  */
 export const generateLook = async (
     personBase64: string, 
@@ -23,7 +23,7 @@ export const generateLook = async (
     bottomBase64: string | null,
     fullBodyBase64: string | null
 ): Promise<string> => {
-    // A chave process.env.API_KEY é protegida pelo ambiente de execução
+    // Instanciação no momento da chamada garantindo uso da chave de ambiente
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const parts: any[] = [];
@@ -37,29 +37,25 @@ export const generateLook = async (
     if (fullBodyBase64) {
         parts.push({ inlineData: { mimeType: 'image/jpeg', data: fullBodyBase64 } });
         specializedInstruction = `
-            TASK: TOTAL_REPLACEMENT_WITH_FULL_GARMENT
-            - O produto enviado é um VESTIDO ou MACACÃO.
-            - Substitua a roupa da pessoa mantendo a anatomia.
-            - Ignore a roupa anterior completamente.
+            TASK: TOTAL_REPLACEMENT
+            - Peça única (VESTIDO/MACACÃO).
+            - Substitua a roupa atual mantendo a anatomia.
         `;
     } else {
         if (topBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: topBase64 } });
         if (bottomBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: bottomBase64 } });
         
         specializedInstruction = `
-            TASK: MODULAR_TRY_ON
-            - Se houver TOP: Substitua o torso superior.
-            - Se houver BOTTOM: Substitua as pernas.
-            - Ajuste natural na cintura.
+            TASK: MODULAR_PLACEMENT
+            - Substitua as partes correspondentes (superior/inferior).
         `;
     }
 
     const masterPrompt = `
-        VOCÊ É UM EXPERT EM MODA DE LUXO.
-        REGRAS:
-        1. Mantenha ROSTO, CABELO e FUNDO originais.
-        2. Aplique a roupa nova com texturas realistas.
-        3. A iluminação deve ser coerente com a foto base.
+        VOCÊ É O MOTOR VOFY (IA DE ALTA MODA).
+        OBJETIVO: Virtual Try-On realista.
+        PRESERVE: Rosto, tom de pele, cabelo e fundo.
+        AJUSTE: Caimento natural e iluminação coerente.
         ${specializedInstruction}
     `;
 
@@ -67,7 +63,7 @@ export const generateLook = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-2.5-flash-image',
             contents: { parts },
             config: {
                 imageConfig: {
@@ -80,11 +76,18 @@ export const generateLook = async (
         if (imagePart?.inlineData) {
             return imagePart.inlineData.data;
         }
-        throw new Error("Falha na renderização visual.");
+        throw new Error("EMPTY_RESPONSE");
     } catch (err: any) {
-        // Log genérico para não expor detalhes técnicos ou de rede a terceiros
-        console.error("VOFY_ENGINE_LOG: Error during generation");
-        throw new Error("O servidor de IA está temporariamente ocupado. Por favor, tente novamente em instantes.");
+        const errorMsg = err?.message || "";
+        
+        // Detecção de erro de cota (429 - Too Many Requests / Quota Exceeded)
+        if (errorMsg.toLowerCase().includes("quota") || errorMsg.includes("429")) {
+            throw new Error("O Ateliê VOFY está com lotação máxima de convidados VIP. Por favor, aguarde 60 segundos e tente sua prova novamente.");
+        }
+        
+        // Outros erros
+        console.error("VOFY_LOG: Service Exception");
+        throw new Error("O servidor de alta costura está processando muitos pedidos. Tente novamente em um instante.");
     }
 };
 

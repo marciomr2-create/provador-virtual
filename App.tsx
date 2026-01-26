@@ -125,6 +125,7 @@ export default function App() {
             const resultB64 = await generateLook(personB64, topB64, bottomB64, fullBodyB64);
             setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
         } catch (error: any) {
+            // Exibição amigável do erro
             alert(error.message);
         } finally {
             setIsProcessing(false);
