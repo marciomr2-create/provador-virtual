@@ -1,5 +1,5 @@
 {
-  "name": "VOFY  - Provador de Roupas Digital ( MVP )",
-  "description": "Um provador virtual movido a IA  e cruzamento de informações do cliente para provar roupas combinando dados e imagens, entregando um resultado  final com indicação do tamanho da peça a ser comprada.",
+  "name": "VOFY - Ateliê de Alta Costura Digital",
+  "description": "Provador virtual de luxo movido a Inteligência Artificial. Experimente looks com fidelidade real em segundos.",
   "requestFramePermissions": []
 }
