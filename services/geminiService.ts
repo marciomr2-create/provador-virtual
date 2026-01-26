@@ -1,4 +1,5 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+
+import { GoogleGenAI } from "@google/genai";
 
 export const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -12,123 +13,86 @@ export const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-export const generateLook = async (person: string, top: string | null, bottom: string | null): Promise<string> => {
+/**
+ * Gera o look combinando a pessoa com as peças de roupa.
+ * Estrutura a entrada para que a IA identifique claramente o que é cada imagem.
+ */
+export const generateLook = async (
+    personBase64: string, 
+    topBase64: string | null, 
+    bottomBase64: string | null,
+    fullBodyBase64: string | null
+): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    let instruction = `INSTRUÇÃO PRINCIPAL: Substitua a roupa da pessoa na imagem base pelas novas peças de roupa fornecidas. A imagem final deve ser fotorrealista e crível.
-
-IMAGENS DE ENTRADA:
-- Imagem 1: Pessoa Base (modelo).
-- Imagem 2 (se fornecida): Peça de Roupa Superior.
-- Imagem 3 (se fornecida): Peça de Roupa Inferior.
-
-PROCESSO OBRIGATÓRIO (Passo a Passo):
-1. ANÁLISE: Identifique a(s) peça(s) de roupa que a Pessoa Base está vestindo (ex: blusa, calça).
-2. REMOÇÃO: Remova DIGITALMENTE a(s) peça(s) de roupa original(is) correspondente(s) às novas peças fornecidas.`;
-
-    if (top && bottom) {
-        instruction += ` Remova a blusa/top e a calça/saia originais.`;
-    } else if (top) {
-        instruction += ` Remova APENAS a blusa/top original.`;
-    } else if (bottom) {
-        instruction += ` Remova APENAS a calça/saia/shorts original.`;
-    }
-
-    instruction += ` É CRUCIAL que a roupa antiga seja 100% removida, não apenas coberta.
-3. RECONSTRUÇÃO: Recrie o corpo da pessoa que estava sob a roupa removida de forma realista.
-4. APLICAÇÃO: Vista a pessoa com a(s) nova(s) peça(s) de roupa. O caimento, a textura, as sombras e a iluminação devem parecer naturais no corpo da pessoa.
-5. PRESERVAÇÃO: Mantenha TODO O RESTO da imagem original INTACTO: o rosto da pessoa, cabelo, pele, pose, o fundo da imagem e qualquer roupa que não foi substituída.
-
-REGRAS FINAIS:
-- FIDELIDADE: As novas peças de roupa na imagem final devem ser idênticas às fornecidas.
-- NÃO SOBREPOR: NUNCA coloque a nova roupa por cima da roupa antiga. A roupa antiga DEVE desaparecer.
-- REALISMO: O resultado final deve parecer uma fotografia real.`;
-
-
+    // Iniciamos com a pessoa como referência principal
     const parts: any[] = [
-        { text: instruction },
-        { inlineData: { mimeType: 'image/jpeg', data: person } } // Pessoa Base
+        { inlineData: { mimeType: 'image/jpeg', data: personBase64 } },
+        { text: "REFERENCE_PERSON: Esta é a pessoa que deve vestir as novas roupas." }
     ];
-    if (top) {
-        parts.push({ inlineData: { mimeType: 'image/jpeg', data: top } }); // Peça de Roupa
+
+    // Adicionamos as peças com labels claros
+    if (fullBodyBase64) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: fullBodyBase64 } });
+        parts.push({ text: "NEW_CLOTHING_FULL: Este é o vestido ou conjunto de corpo inteiro que a pessoa deve usar." });
     }
-    if (bottom) {
-        parts.push({ inlineData: { mimeType: 'image/jpeg', data: bottom } }); // Peça de Roupa
+    if (topBase64) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: topBase64 } });
+        parts.push({ text: "NEW_CLOTHING_TOP: Esta é a peça superior (blusa/jaqueta) que a pessoa deve usar." });
     }
+    if (bottomBase64) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: bottomBase64 } });
+        parts.push({ text: "NEW_CLOTHING_BOTTOM: Esta é a peça inferior (calça/saia) que a pessoa deve usar." });
+    }
+
+    // Instrução final de síntese
+    parts.push({
+        text: `ACTION: Realize um 'Virtual Try-On' realista. 
+        INSTRUCTIONS:
+        1. Remova COMPLETAMENTE a roupa atual da REFERENCE_PERSON.
+        2. Vista a pessoa com as peças marcadas como NEW_CLOTHING.
+        3. Se houver TOP e BOTTOM, combine-os. Se houver FULL, ele tem prioridade.
+        4. Preserve o rosto, cabelo, mãos, pés e a pose da REFERENCE_PERSON exatamente como na imagem original.
+        5. Ajuste o caimento das novas roupas ao corpo da pessoa de forma natural, respeitando sombras e iluminação.
+        6. O fundo da imagem deve permanecer o mesmo.
+        7. Retorne APENAS a imagem final resultante.`
+    });
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts },
-        config: {
-            responseModalities: [Modality.IMAGE],
-        }
+        contents: { parts }
     });
 
-    for (const part of response.candidates[0].content.parts) {
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
             return part.inlineData.data;
         }
     }
-    throw new Error("Nenhuma imagem gerada a partir da criação do look.");
-};
-
-export const editImageWithText = async (baseImage: string, prompt: string): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const fullPrompt = `Atue como um editor de fotos profissional. Sua instrução de edição é: "${prompt}". Ao editar, mantenha a qualidade fotográfica, a iluminação e a identidade da pessoa na imagem. É crucial que você não distorça o rosto. Aplique apenas a alteração solicitada.`;
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-            parts: [
-                { inlineData: { mimeType: 'image/jpeg', data: baseImage } },
-                { text: fullPrompt },
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE],
-        },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-            return part.inlineData.data;
-        }
-    }
-    throw new Error("Nenhuma imagem gerada a partir da edição.");
+    throw new Error("A IA não gerou uma imagem de retorno. Verifique as fotos enviadas.");
 };
 
-export const generateImageFromPrompt = async (prompt: string): Promise<string[]> => {
+/**
+ * Gera um vídeo a partir de uma imagem de outfit.
+ */
+export const generateVideo = async (
+    imageBase64: string,
+    aspectRatio: '16:9' | '9:16',
+    prompt: string
+): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: prompt,
-        config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio: '1:1',
-        },
-    });
-
-    return response.generatedImages.map(img => img.image.imageBytes);
-};
-
-export const generateVideo = async (baseImage: string, aspectRatio: '16:9' | '9:16', prompt: string): Promise<string> => {
-    // Re-create instance to use the latest key from the dialog
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const finalPrompt = prompt.trim() ? prompt : 'Um vídeo curto e cinematográfico desta cena, com movimento sutil e natural.';
     
     let operation = await ai.models.generateVideos({
         model: 'veo-3.1-fast-generate-preview',
-        prompt: finalPrompt,
+        prompt: prompt || 'A high-quality fashion video showcasing the outfit on a moving person, cinematic lighting.',
         image: {
-            imageBytes: baseImage,
+            imageBytes: imageBase64,
             mimeType: 'image/jpeg',
         },
         config: {
             numberOfVideos: 1,
             resolution: '720p',
-            aspectRatio: aspectRatio,
+            aspectRatio: aspectRatio
         }
     });
 
@@ -137,32 +101,24 @@ export const generateVideo = async (baseImage: string, aspectRatio: '16:9' | '9:
         operation = await ai.operations.getVideosOperation({ operation: operation });
     }
 
-    if(operation.error) {
-        throw new Error(operation.error.message || 'A geração de vídeo falhou.');
-    }
-
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) {
-        throw new Error("A geração do vídeo foi concluída, mas nenhum link para download foi encontrado.");
+        throw new Error("Falha ao obter o link do vídeo gerado.");
     }
-
-    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-    if (!videoResponse.ok) {
-        const errorText = await videoResponse.text();
-        console.error("Video download error:", errorText);
-        throw new Error("Falha ao baixar o vídeo gerado.");
-    }
-    const videoBlob = await videoResponse.blob();
-    return URL.createObjectURL(videoBlob);
+    
+    const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
 };
 
-const resizeImage = (imageSrc: string, maxWidth: number, maxHeight: number): Promise<string> => {
-    return new Promise((resolve, reject) => {
+export const resizeImageDataUrl = (dataUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
+    return new Promise((resolve) => {
         const img = new Image();
-        img.src = imageSrc;
+        img.src = dataUrl;
         img.onload = () => {
             const canvas = document.createElement('canvas');
-            let { width, height } = img;
+            let width = img.width;
+            let height = img.height;
 
             if (width > height) {
                 if (width > maxWidth) {
@@ -175,35 +131,11 @@ const resizeImage = (imageSrc: string, maxWidth: number, maxHeight: number): Pro
                     height = maxHeight;
                 }
             }
-
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                return reject(new Error('Could not get canvas context'));
-            }
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.8)); // Use JPEG with quality 0.8 for smaller size
+            ctx?.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
-        img.onerror = (error) => reject(error);
     });
-};
-
-export const fileToResizedDataUrl = (file: File, maxWidth: number, maxHeight: number): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            if (event.target?.result) {
-                resolve(resizeImage(event.target.result as string, maxWidth, maxHeight));
-            } else {
-                reject(new Error('Failed to read file.'));
-            }
-        };
-        reader.onerror = (error) => reject(error);
-    });
-};
-
-export const dataUrlToResizedDataUrl = (dataUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
-    return resizeImage(dataUrl, maxWidth, maxHeight);
 };

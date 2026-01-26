@@ -1,453 +1,325 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { fileToBase64, generateLook, editImageWithText, fileToResizedDataUrl, dataUrlToResizedDataUrl } from './services/geminiService';
+
+import React, { useState, useEffect } from 'react';
+import { 
+    fileToBase64, 
+    generateLook, 
+    resizeImageDataUrl 
+} from './services/geminiService';
+import { ImageUploader } from './components/ImageUploader';
+import { HistoryPanel } from './components/HistoryPanel';
 import { VideoGenerator } from './components/VideoGenerator';
 import { ImageData, SavedOutfit } from './types';
 
-// --- 2. Helper Components ---
-
-const LoadingSpinner: React.FC = () => (
-    <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex flex-col items-center justify-center rounded-lg z-10">
-        <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span className="text-lg font-medium text-teal-300 mt-2">Generating...</span>
+const LoadingOverlay: React.FC<{ message: string }> = ({ message }) => (
+    <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl z-20 border border-teal-500/30">
+        <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-teal-400 font-bold animate-pulse">{message}</p>
     </div>
 );
 
 const AppHeader: React.FC = () => (
-    <header className="bg-gray-800 border-b-2 border-amber-500 p-4 sticky top-0 z-20">
-        <div className="w-full max-w-5xl mx-auto flex flex-col sm:flex-row justify-center items-center">
-            <h1 className="text-3xl font-bold text-amber-300 tracking-tight">Provador Digital<span className="text-teal-400">.AI</span></h1>
+    <header className="bg-gray-900 border-b border-gray-800 p-6 sticky top-0 z-30 shadow-2xl">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <h1 className="text-4xl font-black text-amber-400 tracking-tighter italic">
+                PROVADOR DIGITAL<span className="text-teal-500">.AI</span>
+            </h1>
+            <p className="text-gray-400 text-sm font-medium tracking-widest uppercase">
+                Powered by Gemini 2.5
+            </p>
         </div>
     </header>
 );
 
-interface ImageUploaderProps {
-    id: string;
-    label: string;
-    onImageUpload: (data: ImageData) => void;
-    previewUrl?: string;
-    placeholderText: string;
-    aspectRatio?: 'portrait' | 'square';
-}
-
-const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImageUpload, previewUrl, placeholderText, aspectRatio = 'square' }) => {
-    const [isDragging, setIsDragging] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (!previewUrl && fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-    }, [previewUrl]);
-
-    const handleFile = (file: File) => {
-        if (file && file.type.startsWith('image/')) {
-            const fileUrl = URL.createObjectURL(file);
-            onImageUpload({ file, url: fileUrl });
-        }
-    };
-
-    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleFile(e.dataTransfer.files[0]);
-        }
-    }, [onImageUpload]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            handleFile(e.target.files[0]);
-        }
-    };
-
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault(); e.stopPropagation(); setIsDragging(true);
-    };
-    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault(); e.stopPropagation(); setIsDragging(false);
-    };
-    const handleClick = () => fileInputRef.current?.click();
-
-    const aspectClass = aspectRatio === 'portrait' ? 'aspect-[9/16]' : 'aspect-square';
-
-    return (
-        <div className="flex flex-col gap-2">
-            {label && <label htmlFor={id} className="text-sm font-medium text-amber-200">{label}</label>}
-            <div
-                onClick={handleClick}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                className={`relative w-full ${aspectClass} bg-gray-700 border-2 border-dashed border-gray-500 rounded-lg flex items-center justify-center text-center text-gray-400 cursor-pointer transition-colors hover:border-teal-400 ${isDragging ? 'border-teal-400 bg-gray-600' : ''}`}
-            >
-                {previewUrl ? (
-                    <img src={previewUrl} alt="Preview" className="w-full h-full object-contain rounded-lg" />
-                ) : (
-                    <span>{placeholderText}</span>
-                )}
-                <input
-                    id={id}
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleChange}
-                    className="hidden"
-                />
-            </div>
-        </div>
-    );
-};
-
-interface EditImageModalProps {
-    imageUrl: string;
-    onClose: () => void;
-    onEdit: (prompt: string) => void;
-    isEditing: boolean;
-}
-
-const EditImageModal: React.FC<EditImageModalProps> = ({ imageUrl, onClose, onEdit, isEditing }) => {
-    const [prompt, setPrompt] = useState('');
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (prompt.trim()) {
-            onEdit(prompt);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-amber-400">Editar Imagem</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">&times;</button>
-                </div>
-                <div className="flex flex-col md:flex-row gap-4">
-                    <img src={imageUrl} alt="Para editar" className="w-full md:w-1/2 rounded-lg" />
-                    <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-                        <label htmlFor="edit-prompt" className="text-sm text-gray-300 mb-2">Descreva a mudança:</label>
-                        <textarea
-                            id="edit-prompt"
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            placeholder="Ex: Mude a cor da blusa para vermelho"
-                            className="w-full p-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg flex-grow resize-none"
-                            rows={4}
-                            disabled={isEditing}
-                        />
-                        <div className="flex gap-2 mt-4">
-                            <button type="button" onClick={onClose} className="btn-secondary flex-1" disabled={isEditing}>Cancelar</button>
-                            <button type="submit" className="btn-primary flex-1" disabled={!prompt.trim() || isEditing}>
-                                {isEditing ? 'Editando...' : 'Aplicar'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-interface HistoryPanelProps {
-    outfits: SavedOutfit[];
-    onLoad: (outfit: SavedOutfit) => void;
-    onDelete: (id: number) => void;
-}
-
-const HistoryPanel: React.FC<HistoryPanelProps> = ({ outfits, onLoad, onDelete }) => (
-    <div className="panel p-4 md:p-6">
-        <h2 className="text-xl font-semibold text-amber-400 mb-4">Looks Salvos</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {outfits.map(outfit => (
-                <div key={outfit.id} className="bg-gray-700 rounded-lg overflow-hidden shadow">
-                    <img src={outfit.generatedLookUrl} alt="Look salvo" className="w-full aspect-[9/16] object-cover" />
-                    <div className="p-2 flex flex-col gap-2">
-                        <button onClick={() => onLoad(outfit)} className="btn-secondary text-sm w-full">Carregar</button>
-                        <button onClick={() => onDelete(outfit.id)} className="bg-red-700 hover:bg-red-600 text-white text-sm py-1 px-2 rounded w-full">Excluir</button>
-                    </div>
-                </div>
-            ))}
-        </div>
-    </div>
-);
-
-
-// --- 3. Main App Component ---
-function App() {
-    // --- States ---
-    const [videoUrl, setVideoUrl] = useState('');
+export default function App() {
+    // Estados das Imagens
     const [clientImage, setClientImage] = useState<ImageData | null>(null);
     const [topImage, setTopImage] = useState<ImageData | null>(null);
     const [bottomImage, setBottomImage] = useState<ImageData | null>(null);
+    const [fullBodyImage, setFullBodyImage] = useState<ImageData | null>(null);
+    
+    // Chaves de Reset para forçar remount dos componentes e limpeza física dos inputs
+    const [clothingResetKey, setClothingResetKey] = useState(0);
+    const [clientResetKey, setClientResetKey] = useState(0);
+    
+    // Resultados
     const [generatedLook, setGeneratedLook] = useState<string | null>(null);
     const [generatedLookBase64, setGeneratedLookBase64] = useState<string | null>(null);
-    const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16');
-    const [isCreatingLook, setIsCreatingLook] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
+    const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+    
+    // UI State
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState('');
     const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
-    
-    // --- LocalStorage Effects for Persistence ---
+
     useEffect(() => {
-        try {
-            const storedOutfits = localStorage.getItem('savedOutfits');
-            if (storedOutfits) {
-                setSavedOutfits(JSON.parse(storedOutfits));
-            }
-        } catch (error) {
-            console.error("Failed to load data from localStorage", error);
-        }
+        const stored = localStorage.getItem('provador_history');
+        if (stored) setSavedOutfits(JSON.parse(stored));
     }, []);
 
     useEffect(() => {
-        try {
-            localStorage.setItem('savedOutfits', JSON.stringify(savedOutfits));
-        } catch (error) {
-            console.error("Failed to save outfits to localStorage", error);
-            alert("Erro: Não foi possível salvar o look. O armazenamento local pode estar cheio.");
-        }
+        localStorage.setItem('provador_history', JSON.stringify(savedOutfits));
     }, [savedOutfits]);
-    
-    // --- Core Handlers ---
-    const handleCreateLook = useCallback(async () => {
-        if (!clientImage?.file || (!topImage?.file && !bottomImage?.file)) {
-            alert("Por favor, envie a imagem do cliente e pelo menos uma peça de roupa.");
-            return;
-        }
-        
-        setIsCreatingLook(true);
-        setGeneratedLook(null);
-        setGeneratedLookBase64(null);
-        setVideoUrl('');
-        try {
-            const personB64 = await fileToBase64(clientImage.file);
-            const topB64 = topImage?.file ? await fileToBase64(topImage.file) : null;
-            const bottomB64 = bottomImage?.file ? await fileToBase64(bottomImage.file) : null;
 
-            const resultB64 = await generateLook(personB64, topB64, bottomB64);
-            
-            setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
-            setGeneratedLookBase64(resultB64);
-        } catch (error) {
-            console.error(error);
-            alert(`Falha ao criar o look: ${error.message}`);
-        } finally {
-            setIsCreatingLook(false);
-        }
-    }, [clientImage, topImage, bottomImage]);
-
-    const handleEditLook = useCallback(async (editPrompt: string) => {
-        if (!generatedLookBase64) return;
-        
-        setIsEditing(true);
-        try {
-            const resultB64 = await editImageWithText(generatedLookBase64, editPrompt);
-            
-            setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
-            setGeneratedLookBase64(resultB64);
-            setShowEditModal(false);
-        } catch (error) {
-            console.error(error);
-            alert(`Falha ao editar a imagem: ${error.message}`);
-        } finally {
-            setIsEditing(false);
-        }
-    }, [generatedLookBase64]);
-
-    const handleClearScreen = useCallback(() => {
-        setClientImage(null);
-        setTopImage(null);
-        setBottomImage(null);
-        setGeneratedLook(null);
-        setGeneratedLookBase64(null);
-        setVideoUrl('');
-    }, []);
-    
-    const handleDownload = () => {
-        if (!generatedLook) return;
-        const link = document.createElement('a');
-        link.href = generatedLook;
-        link.download = 'provador-digital-ai.jpg';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    /**
+     * Helper para converter ImageData para Base64 independentemente da origem (File ou DataURL)
+     */
+    const getB64 = async (img: ImageData | null): Promise<string | null> => {
+        if (!img) return null;
+        if (img.file) return await fileToBase64(img.file);
+        if (img.url.startsWith('data:')) return img.url.split(',')[1];
+        return null;
     };
 
-    // --- History Handlers ---
-    const handleSaveOutfit = useCallback(async () => {
-        if (!clientImage?.file || (!topImage?.file && !bottomImage?.file) || !generatedLook) {
-            alert("Não é possível salvar. Certifique-se de que as imagens originais foram carregadas nesta sessão para salvar.");
+    /**
+     * NOVA PROVA: Limpa apenas os quadros de peças (superior, inferior, única)
+     * e o resultado gerado. Mantém a foto do cliente.
+     */
+    const handleNewTryOn = () => {
+        setTopImage(null);
+        setBottomImage(null);
+        setFullBodyImage(null);
+        setGeneratedLook(null);
+        setGeneratedLookBase64(null);
+        setGeneratedVideoUrl(null);
+        
+        // Incrementa a chave para limpar fisicamente os componentes de upload de roupas
+        setClothingResetKey(prev => prev + 1);
+        
+        const clothingSection = document.getElementById('clothing-selection');
+        if (clothingSection) {
+            clothingSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    /**
+     * TROCAR CLIENTE: Limpa TUDO. Reinicia o procedimento do zero.
+     */
+    const handleResetAll = () => {
+        if (window.confirm("Deseja trocar o cliente? Todas as imagens atuais serão removidas.")) {
+            setClientImage(null);
+            setClientResetKey(prev => prev + 1);
+            handleNewTryOn(); 
+        }
+    };
+
+    const handleCreateLook = async () => {
+        if (!clientImage || (!topImage && !bottomImage && !fullBodyImage)) {
+            alert("Por favor, selecione ao menos uma peça de roupa para provar.");
             return;
         }
+        
+        setIsProcessing(true);
+        setLoadingMessage('Criando seu novo visual...');
+        setGeneratedVideoUrl(null);
 
         try {
-            const MAX_DIM = 512;
-            const clientPromise = fileToResizedDataUrl(clientImage.file, MAX_DIM, MAX_DIM);
-            const topPromise = topImage?.file ? fileToResizedDataUrl(topImage.file, MAX_DIM, MAX_DIM) : Promise.resolve(null);
-            const bottomPromise = bottomImage?.file ? fileToResizedDataUrl(bottomImage.file, MAX_DIM, MAX_DIM) : Promise.resolve(null);
-            const generatedPromise = dataUrlToResizedDataUrl(generatedLook, MAX_DIM, MAX_DIM * 1.77); // Approx 16:9
+            const personB64 = await getB64(clientImage);
+            const topB64 = await getB64(topImage);
+            const bottomB64 = await getB64(bottomImage);
+            const fullBodyB64 = await getB64(fullBodyImage);
 
-            const [clientImageUrl, topImageUrl, bottomImageUrl, generatedLookUrl] = await Promise.all([
-                clientPromise,
-                topPromise,
-                bottomPromise,
-                generatedPromise,
-            ]);
+            if (!personB64) throw new Error("Imagem do cliente inválida.");
 
+            const resultB64 = await generateLook(personB64, topB64, bottomB64, fullBodyB64);
+            setGeneratedLookBase64(resultB64);
+            setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
+        } catch (error: any) {
+            alert(`Erro ao gerar look: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleSaveOutfit = async () => {
+        if (!generatedLook) return;
+        setIsProcessing(true);
+        setLoadingMessage('Salvando no histórico...');
+        try {
+            const thumb = await resizeImageDataUrl(generatedLook, 300, 533);
             const newOutfit: SavedOutfit = {
                 id: Date.now(),
-                clientImageUrl,
-                topImageUrl,
-                bottomImageUrl,
-                generatedLookUrl,
+                clientImageUrl: clientImage?.url || '',
+                topImageUrl: topImage?.url || null,
+                bottomImageUrl: bottomImage?.url || null,
+                fullBodyImageUrl: fullBodyImage?.url || null,
+                generatedLookUrl: thumb
             };
-
-            setSavedOutfits(prev => [newOutfit, ...prev]);
+            setSavedOutfits([newOutfit, ...savedOutfits.slice(0, 19)]);
             alert("Look salvo!");
-
-        } catch (error) {
-            console.error("Falha ao redimensionar e salvar o look:", error);
-            alert("Ocorreu um erro ao salvar o look. As imagens podem ser muito grandes ou em um formato inválido.");
+        } catch (e) {
+            alert("Erro ao salvar histórico.");
+        } finally {
+            setIsProcessing(false);
         }
-    }, [clientImage, topImage, bottomImage, generatedLook]);
+    };
 
-    const handleLoadOutfit = useCallback((outfit: SavedOutfit) => {
+    const handleLoadOutfit = (outfit: SavedOutfit) => {
         setClientImage({ url: outfit.clientImageUrl });
         setTopImage(outfit.topImageUrl ? { url: outfit.topImageUrl } : null);
         setBottomImage(outfit.bottomImageUrl ? { url: outfit.bottomImageUrl } : null);
+        setFullBodyImage(outfit.fullBodyImageUrl ? { url: outfit.fullBodyImageUrl } : null);
         setGeneratedLook(outfit.generatedLookUrl);
-        
-        if (outfit.generatedLookUrl.includes(',')) {
-            setGeneratedLookBase64(outfit.generatedLookUrl.split(',')[1]);
-        }
-        
-        setVideoUrl('');
-        alert("Look carregado.");
-        window.scrollTo(0, 0);
-    }, []);
-
-    const handleDeleteOutfit = useCallback((id: number) => {
-        setSavedOutfits(prev => prev.filter(outfit => outfit.id !== id));
-    }, []);
-
-    // --- Render Functions ---
-
-    const renderDressingRoom = () => (
-        <div className="flex flex-col">
-            <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 md:p-6">
-                <div className="panel flex flex-col gap-4 p-4 md:p-6">
-                    <h2 className="text-xl font-semibold text-amber-400">1. Imagem do Cliente</h2>
-                    <ImageUploader id="cliente-img-input" label="" onImageUpload={setClientImage} previewUrl={clientImage?.url} placeholderText="Arraste ou clique para enviar a foto do cliente" aspectRatio="portrait" />
-                </div>
-
-                <div className="panel flex flex-col gap-4 p-4 md:p-6">
-                    <h2 className="text-xl font-semibold text-amber-400">2. Itens de Vestuário</h2>
-                    <div className="flex flex-col gap-4 flex-grow overflow-y-auto min-h-0">
-                        <ImageUploader id="superior-img-input" label="Superior" onImageUpload={setTopImage} previewUrl={topImage?.url} placeholderText="Peça Superior" />
-                        <ImageUploader id="inferior-img-input" label="Inferior" onImageUpload={setBottomImage} previewUrl={bottomImage?.url} placeholderText="Peça Inferior" />
-                    </div>
-                    
-                    <div className="flex gap-4 mt-auto">
-                        <button
-                            id="limpar-tela-btn"
-                            className="btn-secondary w-1/2"
-                            onClick={handleClearScreen}
-                        >
-                            Limpar
-                        </button>
-                        <button 
-                            id="criar-look-btn" 
-                            className="btn-primary w-1/2" 
-                            onClick={handleCreateLook} 
-                            disabled={!clientImage?.file || (!topImage?.file && !bottomImage?.file) || isCreatingLook}
-                        >
-                            {isCreatingLook ? 'Criando Look...' : 'Criar Look'}
-                        </button>
-                    </div>
-                </div>
-                
-                <div className="panel flex flex-col gap-4 p-4 md:p-6">
-                    <h2 className="text-xl font-semibold text-amber-400">3. Resultado Gerado</h2>
-                    <div id="resultado-container" className={`relative w-full bg-gray-700 rounded-lg flex items-center justify-center transition-all duration-300 ${aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-[16:9]'}`}>
-                        {isCreatingLook && <LoadingSpinner />}
-                        
-                        {videoUrl ? (
-                            <video 
-                                src={videoUrl} 
-                                controls 
-                                autoPlay 
-                                loop 
-                                className="w-full h-full object-contain rounded-lg"
-                            />
-                        ) : (
-                            <img id="resultado-img" src={generatedLook ?? `https://placehold.co/${aspectRatio === '9:16' ? '900x1600' : '1600x900'}/374151/ca8a04?text=Aguardando...`} alt="Look Gerado" className="w-full h-full object-contain rounded-lg" />
-                        )}
-                    </div>
-                    <div className="flex flex-col gap-4 mt-auto">
-                        <div>
-                            <h3 className="text-lg font-medium text-amber-400">Proporção</h3>
-                            <div className="flex gap-2 mt-1">
-                                {(['9:16', '16:9'] as const).map(ratio => (
-                                    <button key={ratio} onClick={() => setAspectRatio(ratio)} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${aspectRatio === ratio ? 'bg-teal-600 text-white' : 'bg-gray-600 text-gray-200 hover:bg-gray-500'}`}>
-                                        {ratio} {ratio === '9:16' ? '(V)' : '(H)'}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div id="post-actions" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <button onClick={() => setShowEditModal(true)} className="btn-secondary flex-1" disabled={!generatedLook}>Editar</button>
-                            <button onClick={handleDownload} className="btn-secondary flex-1" disabled={!generatedLook}>Baixar</button>
-                            <button onClick={handleSaveOutfit} className="btn-secondary flex-1" disabled={!generatedLook || !clientImage?.file || (!topImage?.file && !bottomImage?.file)}>Salvar</button>
-                        </div>
-
-                         <VideoGenerator
-                            imageBase64={generatedLookBase64}
-                            aspectRatio={aspectRatio}
-                            onVideoGenerated={(url) => setVideoUrl(url ?? '')}
-                            onGenerationStateChange={(isGenerating) => {
-                                if (isGenerating) setVideoUrl('');
-                            }}
-                        />
-                    </div>
-                </div>
-            </div>
-             {savedOutfits.length > 0 && (
-                 <div className="px-4 md:px-6 pb-6">
-                     <HistoryPanel
-                         outfits={savedOutfits}
-                         onLoad={handleLoadOutfit}
-                         onDelete={handleDeleteOutfit}
-                     />
-                 </div>
-            )}
-            {showEditModal && generatedLook && (
-                <EditImageModal imageUrl={generatedLook} onClose={() => setShowEditModal(false)} onEdit={handleEditLook} isEditing={isEditing} />
-            )}
-        </div>
-    );
+        setGeneratedLookBase64(outfit.generatedLookUrl.includes(',') ? outfit.generatedLookUrl.split(',')[1] : null);
+        setGeneratedVideoUrl(null);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-amber-300 flex flex-col">
-            <style>{`
-                /* Estilos Globais para Tailwind */
-                .panel { background-color: #1f2937; /* gray-800 */ border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
-                .btn-primary { background-color: #0d9488; /* teal-600 */ color: white; font-weight: 600; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: background-color 0.2s; }
-                .btn-primary:hover:not(:disabled) { background-color: #0f766e; /* teal-700 */ }
-                .btn-primary:disabled { background-color: #4b5563; /* gray-600 */ cursor: not-allowed; }
-                .btn-secondary { background-color: #4b5563; /* gray-600 */ color: #e5e7eb; /* gray-200 */ font-weight: 600; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: background-color 0.2s; }
-                .btn-secondary:hover:not(:disabled) { background-color: #374151; /* gray-700 */ }
-                .btn-secondary:disabled { background-color: #374151; /* gray-700 */ color: #6b7280; /* gray-500 */ cursor: not-allowed; }
-            `}</style>
+        <div className="min-h-screen bg-[#0a0a0c] text-gray-100 selection:bg-teal-500/30 font-sans">
             <AppHeader />
-            <main className="flex-grow">
-                {renderDressingRoom()}
+            
+            <main className="max-w-7xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <div className="lg:col-span-4 space-y-6">
+                    <section className="bg-gray-900/50 p-6 rounded-2xl border border-gray-800 shadow-xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-amber-400 flex items-center gap-2">
+                                <span className="bg-amber-400 text-black w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">1</span>
+                                Sua Foto
+                            </h2>
+                            {clientImage && (
+                                <button 
+                                    onClick={handleResetAll} 
+                                    className="text-[10px] uppercase font-bold text-gray-500 hover:text-red-400 transition-colors border-b border-transparent hover:border-red-400/30"
+                                >
+                                    Trocar Cliente
+                                </button>
+                            )}
+                        </div>
+                        <ImageUploader 
+                            key={`client-${clientResetKey}`}
+                            id="client-up" 
+                            label="" 
+                            placeholderText="Arraste ou clique (corpo inteiro)" 
+                            onImageUpload={setClientImage} 
+                            previewUrl={clientImage?.url} 
+                            aspectRatio="portrait"
+                        />
+                    </section>
+
+                    <section id="clothing-selection" className="bg-gray-900/50 p-6 rounded-2xl border border-gray-800 shadow-xl">
+                        <h2 className="text-xl font-bold text-amber-400 mb-6 flex items-center gap-2">
+                            <span className="bg-amber-400 text-black w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">2</span>
+                            Novas Peças
+                        </h2>
+                        <div className="space-y-4">
+                            <ImageUploader 
+                                key={`full-${clothingResetKey}`}
+                                id="full-up" 
+                                label="Peça Única / Vestido" 
+                                placeholderText="Vestidos, Macacões, etc." 
+                                onImageUpload={setFullBodyImage} 
+                                previewUrl={fullBodyImage?.url}
+                                aspectRatio="portrait"
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <ImageUploader 
+                                    key={`top-${clothingResetKey}`}
+                                    id="top-up" 
+                                    label="Parte Superior" 
+                                    placeholderText="Blusa, Jaqueta" 
+                                    onImageUpload={setTopImage} 
+                                    previewUrl={topImage?.url}
+                                />
+                                <ImageUploader 
+                                    key={`bottom-${clothingResetKey}`}
+                                    id="bottom-up" 
+                                    label="Parte Inferior" 
+                                    placeholderText="Calça, Saia" 
+                                    onImageUpload={setBottomImage} 
+                                    previewUrl={bottomImage?.url}
+                                />
+                            </div>
+                        </div>
+                        <button 
+                            onClick={handleCreateLook}
+                            disabled={isProcessing || !clientImage}
+                            className="w-full mt-8 btn-primary py-4 text-lg shadow-lg shadow-teal-500/20 active:scale-95 transition-all"
+                        >
+                            {isProcessing ? 'PROCESSANDO...' : 'GERAR LOOK'}
+                        </button>
+                    </section>
+                </div>
+
+                <div className="lg:col-span-8 space-y-6">
+                    <section className="bg-gray-900/50 p-6 rounded-2xl border border-gray-800 shadow-xl min-h-[600px] flex flex-col relative overflow-hidden">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-teal-400 uppercase tracking-widest">Visualização do Outfit</h2>
+                            {generatedLook && (
+                                <span className="text-xs bg-teal-500/10 text-teal-400 px-3 py-1 rounded-full border border-teal-500/20">Alta Definição</span>
+                            )}
+                        </div>
+
+                        <div className="relative flex-grow bg-black/40 rounded-xl overflow-hidden border border-gray-800 flex items-center justify-center min-h-[500px]">
+                            {isProcessing && <LoadingOverlay message={loadingMessage} />}
+                            
+                            {generatedLook ? (
+                                <img src={generatedLook} alt="Look Gerado" className="max-w-full max-h-[700px] object-contain shadow-2xl animate-in fade-in zoom-in duration-500" />
+                            ) : (
+                                <div className="text-gray-600 text-center p-8 max-w-sm">
+                                    <div className="w-20 h-20 mx-auto mb-6 bg-gray-800 rounded-full flex items-center justify-center opacity-30">
+                                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    </div>
+                                    <p className="font-medium text-lg mb-2">Aguardando Criação</p>
+                                    <p className="text-sm opacity-50">Sua foto está carregada. Escolha novas peças ao lado para trocá-las.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {generatedLook && (
+                            <div className="animate-in slide-in-from-bottom-4 duration-500">
+                                <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <button 
+                                        onClick={handleNewTryOn} 
+                                        className="btn-secondary flex items-center justify-center gap-2 py-3 border border-amber-500/30 hover:border-amber-500/60 transition-all bg-amber-500/10 hover:bg-amber-500/20 shadow-inner group"
+                                    >
+                                        <svg className="w-4 h-4 text-amber-400 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                        Nova Prova
+                                    </button>
+                                    <button onClick={handleSaveOutfit} className="btn-secondary flex items-center justify-center gap-2 py-3">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+                                        Salvar Look
+                                    </button>
+                                    <a href={generatedLook} download="meu-novo-look.jpg" className="btn-primary flex items-center justify-center gap-2 py-3 text-center">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                        Baixar Foto
+                                    </a>
+                                </div>
+
+                                <div className="mt-8 pt-8 border-t border-gray-800">
+                                    <h3 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                        Gerar Vídeo de Visualização
+                                    </h3>
+                                    <VideoGenerator 
+                                        imageBase64={generatedLookBase64}
+                                        aspectRatio="9:16"
+                                        onVideoGenerated={setGeneratedVideoUrl}
+                                        onGenerationStateChange={(loading, err) => {
+                                            if (err) console.error(err);
+                                        }}
+                                    />
+                                    {generatedVideoUrl && (
+                                        <div className="mt-4 bg-black rounded-xl overflow-hidden border border-teal-500/30 shadow-2xl">
+                                            <video src={generatedVideoUrl} controls className="w-full h-auto" />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                    
+                    {savedOutfits.length > 0 && (
+                        <section className="bg-gray-900/50 p-6 rounded-2xl border border-gray-800 shadow-xl">
+                            <HistoryPanel 
+                                outfits={savedOutfits} 
+                                onLoad={handleLoadOutfit} 
+                                onDelete={(id) => setSavedOutfits(s => s.filter(o => o.id !== id))} 
+                            />
+                        </section>
+                    )}
+                </div>
             </main>
         </div>
     );
 }
-
-export default App;

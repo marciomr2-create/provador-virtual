@@ -1,3 +1,4 @@
+
 export interface ImageData {
   file?: File; // Optional for loaded outfits
   url: string;
@@ -11,5 +12,6 @@ export interface SavedOutfit {
   clientImageUrl: string;
   topImageUrl: string | null;
   bottomImageUrl: string | null;
+  fullBodyImageUrl: string | null;
   generatedLookUrl: string;
 }

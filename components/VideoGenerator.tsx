@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { useApiKey } from '../hooks/useApiKey';
 import { generateVideo } from '../services/geminiService';
@@ -46,10 +47,9 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ imageBase64, asp
     const handleGenerateVideo = useCallback(async () => {
         if (!imageBase64) return;
 
+        // Mitiga condição de corrida: assume que a seleção foi bem-sucedida e prossegue.
         if (!isKeySelected) {
             await selectKey();
-            // After selection, user must click 'Generate' again to confirm.
-            return;
         }
 
         setIsGenerating(true);

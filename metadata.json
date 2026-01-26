@@ -1,5 +1,5 @@
 {
-  "name": "Provador Digital.AI",
-  "description": "An AI-powered digital dressing room to try on clothes by combining images. It also includes features for text-to-image generation, text-based image editing, and generating videos from images using Gemini and Veo models.",
+  "name": "VOFY  - Provador de Roupas Digital ( MVP )",
+  "description": "Um provador virtual movido a IA  e cruzamento de informações do cliente para provar roupas combinando dados e imagens, entregando um resultado  final com indicação do tamanho da peça a ser comprada.",
   "requestFramePermissions": []
 }

@@ -1,4 +1,5 @@
-import React, { useRef, useState, useCallback } from 'react';
+
+import React, { useRef, useState } from 'react';
 import { ImageData } from '../types';
 
 interface ImageUploaderProps {
@@ -7,12 +8,12 @@ interface ImageUploaderProps {
     onImageUpload: (imageData: ImageData) => void;
     previewUrl?: string;
     placeholderText: string;
-    aspectRatio?: 'square' | 'portrait' | 'landscape';
+    aspectRatio?: 'square' | 'portrait';
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImageUpload, previewUrl, placeholderText, aspectRatio = 'square' }) => {
     const inputRef = useRef<HTMLInputElement>(null);
-    const [isDragging, setIsDragging] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
 
     const handleFile = (file: File | null) => {
         if (file && file.type.startsWith('image/')) {
@@ -23,74 +24,41 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImage
         }
     };
 
-    const handleAreaClick = () => {
-        inputRef.current?.click();
-    };
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        handleFile(event.target.files?.[0] ?? null);
-    };
-
-    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-        handleFile(e.dataTransfer.files?.[0] ?? null);
-    }, [onImageUpload]);
-
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(true);
-    };
-
-    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-    };
-
-    const aspectRatioClass = {
-        square: 'aspect-square',
-        portrait: 'aspect-[9/16]',
-        landscape: 'aspect-video',
-    }[aspectRatio];
-    
-    // Combine classes for dynamic styling
-    const areaClasses = [
-        'upload-area',
-        'relative w-full transition-all duration-300',
-        aspectRatioClass,
-        isDragging ? 'border-amber-500 bg-gray-600' : '',
-        previewUrl ? 'border-solid border-teal-500' : ''
-    ].filter(Boolean).join(' ');
-
-
     return (
-        <div className="flex flex-col gap-1">
-            {label && <h3 className="text-base font-medium text-amber-400">{label}</h3>}
+        <div className="flex flex-col gap-2">
+            {label && <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{label}</span>}
             <div
-                className={areaClasses}
-                onClick={handleAreaClick}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
+                onClick={() => inputRef.current?.click()}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                className={`
+                    relative cursor-pointer overflow-hidden rounded-xl border-2 border-dashed transition-all duration-300
+                    ${aspectRatio === 'portrait' ? 'aspect-[3/4]' : 'aspect-square'}
+                    ${previewUrl ? 'border-teal-500/50' : 'border-gray-800 hover:border-amber-500/50 hover:bg-gray-800/30'}
+                `}
             >
                 {previewUrl ? (
-                    <img src={previewUrl} alt={label} className="w-full h-full object-cover rounded-lg" />
+                    <>
+                        <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                        {isHovered && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs font-bold text-white uppercase">
+                                Alterar Imagem
+                            </div>
+                        )}
+                    </>
                 ) : (
-                    <div className="flex items-center justify-center h-full">
-                        <span className="text-center text-xs p-2">{placeholderText}</span>
+                    <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                        <svg className="w-8 h-8 mb-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                        <span className="text-xs text-gray-500 px-4">{placeholderText}</span>
                     </div>
                 )}
             </div>
             <input
                 type="file"
-                id={id}
                 ref={inputRef}
                 className="hidden"
                 accept="image/*"
-                onChange={handleFileChange}
+                onChange={(e) => handleFile(e.target.files?.[0] || null)}
             />
         </div>
     );
