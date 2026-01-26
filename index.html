@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,76 +10,82 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Dark Theme with Gold and Teal Accents */
+        /* Dark Theme with Luxury Champagne Gold and Off-White Accents */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #111827; /* Tailwind bg-gray-900 */
-            color: #fcd34d; /* Tailwind amber-300 */
+            background-color: #0a0a0b; 
+            color: #FDFBF7; /* Off-White */
         }
 
-        /* Painel Style (Consolidated & Reduced) */
+        /* Champagne Gold color: #D4AF37 */
+        /* Off-White color: #FDFBF7 */
+
         .panel {
-            background-color: #1f2937; /* gray-800 */
-            border-radius: 0.5rem;
-            padding: 1rem; /* Reduced from 1.5rem */
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            background-color: #161618;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            border: 1px solid #27272a;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
         }
 
-        /* Upload Area Style (Reduced) */
         .upload-area {
-            border: 2px dashed #4b5563; /* border-dashed border-gray-600 */
-            border-radius: 0.5rem; /* rounded-lg */
+            border: 2px dashed #3f3f46;
+            border-radius: 0.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 120px; /* Reduced from 150px */
-            background-color: #374151; /* bg-gray-700 */
-            color: #d1d5db; /* text-gray-300 */
+            min-height: 120px;
+            background-color: #111113;
+            color: #FDFBF7;
             cursor: pointer;
-            transition: background-color 0.2s, border-color 0.2s;
+            transition: all 0.3s ease;
         }
         .upload-area:hover {
-            background-color: #4b5563; /* bg-gray-600 */
-            border-color: #f59e0b; /* border-amber-500 */
+            background-color: #18181b;
+            border-color: #D4AF37;
         }
 
-        /* Primary Button (Consolidated & Reduced) */
+        /* Primary Button - Champagne Gold */
         .btn-primary {
-            background-color: #0d9488; /* teal-600 */
-            color: white;
-            font-weight: 600;
-            padding: 0.5rem 0.875rem; /* Reduced */
-            font-size: 0.875rem; /* Smaller font */
+            background-color: #D4AF37;
+            color: #0a0a0b; /* Black text for high contrast on gold */
+            font-weight: 800;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
             border-radius: 0.5rem;
-            transition: background-color 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px 0 rgba(212, 175, 55, 0.2);
         }
         .btn-primary:hover:not(:disabled) {
-            background-color: #0f766e; /* teal-700 */
+            background-color: #e5c05b;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px 0 rgba(212, 175, 55, 0.3);
         }
         .btn-primary:disabled {
-            background-color: #4b5563; /* gray-600 */
-            color: #6b7280;
+            background-color: #3f3f46;
+            color: #71717a;
             cursor: not-allowed;
+            box-shadow: none;
         }
 
-        /* Secondary Button (Consolidated & Reduced) */
+        /* Secondary Button - Dark with Off-White border */
         .btn-secondary {
-            background-color: #4b5563; /* gray-600 */
-            color: #e5e7eb; /* gray-200 */
+            background-color: transparent;
+            color: #FDFBF7;
             font-weight: 600;
-            padding: 0.375rem 0.75rem; /* Reduced */
-            font-size: 0.875rem; /* Smaller font */
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
             border-radius: 0.5rem;
-            transition: background-color 0.2s;
-            border: none;
+            transition: all 0.3s ease;
+            border: 1px solid #3f3f46;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
         .btn-secondary:hover:not(:disabled) {
-            background-color: #374151; /* gray-700 */
-        }
-        .btn-secondary:disabled {
-            background-color: #374151; /* gray-700 */
-            color: #6b7280; /* gray-500 */
-            cursor: not-allowed;
+            background-color: #18181b;
+            border-color: #FDFBF7;
         }
     </style>
 <script type="importmap">
