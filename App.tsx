@@ -11,29 +11,29 @@ import { HistoryPanel } from './components/HistoryPanel';
 import { ImageData, SavedOutfit } from './types';
 
 const LoadingOverlay: React.FC<{ message: string }> = ({ message }) => (
-    <div className="absolute inset-0 bg-[#0a0a0b]/90 backdrop-blur-md flex flex-col items-center justify-center rounded-xl z-50 border border-[#D4AF37]/20 px-6 text-center">
-        <div className="w-16 h-16 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mb-6"></div>
-        <p className="text-[#D4AF37] font-bold animate-pulse tracking-widest uppercase text-[10px] leading-relaxed max-w-[200px]">{message}</p>
+    <div className="absolute inset-0 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center rounded-3xl z-50 px-6 text-center border border-[#C6B8A6]/20">
+        <div className="w-12 h-12 border-4 border-[#C6B8A6] border-t-transparent rounded-full animate-spin mb-6"></div>
+        <p className="text-[#2B2B2B] font-bold animate-pulse tracking-widest uppercase text-[10px] leading-relaxed max-w-[200px]">{message}</p>
     </div>
 );
 
 const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
-    <header className="bg-[#050505] border-b border-[#27272a] p-6 sticky top-0 z-[100] shadow-2xl">
+    <header className="bg-white border-b border-[#E8E7E4] p-6 sticky top-0 z-[100] shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col">
-                <h1 className="text-4xl font-black text-[#D4AF37] tracking-tighter italic flex items-baseline">
+                <h1 className="text-4xl font-black text-[#2B2B2B] tracking-tighter italic flex items-baseline">
                     VOFY
-                    <span className="text-[12px] font-normal not-italic lowercase tracking-normal ml-2 text-white opacity-80">(mvp)</span>
+                    <span className="text-[12px] font-normal not-italic lowercase tracking-normal ml-2 text-[#7A7A7A]">(mvp)</span>
                 </h1>
-                <span className="text-[10px] text-white font-bold uppercase tracking-[0.3em] -mt-1">Provador Digital de Alta Performance</span>
+                <span className="text-[10px] text-[#C6B8A6] font-bold uppercase tracking-[0.3em] -mt-1">Provador Digital de Alta Fidelidade</span>
             </div>
             <div className="flex gap-4 items-center">
                  <button 
                     onClick={onReset}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-red-900/40 hover:bg-red-800/60 text-white border border-red-700/50 rounded-full transition-all group shadow-lg active:scale-90"
+                    className="flex items-center gap-2 px-6 py-2.5 bg-[#F6F5F2] hover:bg-[#E8E7E4] text-[#2B2B2B] border border-[#E8E7E4] rounded-full transition-all group active:scale-95"
                  >
-                    <svg className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    <span className="text-[11px] font-black uppercase tracking-[0.15em]">LIMPAR TUDO</span>
+                    <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <span className="text-[11px] font-bold uppercase tracking-[0.15em]">LIMPAR</span>
                  </button>
             </div>
         </div>
@@ -110,41 +110,41 @@ export default function App() {
         }
     };
 
-    // TELA DE ACESSO AO ATELIÊ (PARA LIBERAR O MOTOR PRO)
     if (!isKeySelected) {
         return (
-            <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center p-6 text-center">
-                <div className="max-w-md w-full bg-[#161618] border border-[#D4AF37]/30 p-12 rounded-[2rem] shadow-2xl animate-in zoom-in duration-700">
-                    <h1 className="text-5xl font-black text-[#D4AF37] italic mb-2 tracking-tighter flex items-baseline justify-center">
+            <div className="min-h-screen bg-[#F6F5F2] flex items-center justify-center p-6 text-center">
+                <div className="max-w-md w-full bg-white border border-[#E8E7E4] p-12 rounded-[2.5rem] shadow-xl animate-in zoom-in duration-700">
+                    <h1 className="text-5xl font-black text-[#2B2B2B] italic mb-2 tracking-tighter flex items-baseline justify-center">
                         VOFY
-                        <span className="text-[14px] font-normal not-italic lowercase tracking-normal ml-3 text-white opacity-80">(mvp)</span>
+                        <span className="text-[14px] font-normal not-italic lowercase tracking-normal ml-3 text-[#7A7A7A] opacity-80">(mvp)</span>
                     </h1>
-                    <p className="text-white text-[10px] uppercase tracking-[0.4em] mb-12">Provador de Luxo</p>
-                    <p className="text-white text-sm mb-12 leading-relaxed">
-                        Bem-vindo ao Ateliê. Para utilizar nosso motor de <span className="text-[#D4AF37]">Alta Fidelidade PRO</span>, clique no botão abaixo para autorizar o acesso.
+                    <p className="text-[#C6B8A6] text-[10px] uppercase tracking-[0.4em] mb-12 font-bold">Provador Digital Pro</p>
+                    <p className="text-[#7A7A7A] text-sm mb-12 leading-relaxed">
+                        Bem-vindo ao Ateliê Digital. Para utilizar nosso motor de <span className="text-[#2B2B2B] font-bold">Alta Fidelidade PRO</span>, clique abaixo para autorizar o acesso.
                     </p>
                     <button 
                         onClick={selectKey}
-                        className="w-full py-5 text-lg rounded-xl font-black uppercase tracking-widest bg-[#D4AF37] text-white shadow-[0_0_50px_rgba(212,175,55,0.2)] hover:bg-[#e5c05b] transition-all"
+                        className="w-full py-5 text-lg rounded-2xl font-black uppercase tracking-widest bg-[#C6B8A6] text-white shadow-lg hover:bg-[#b5a896] transition-all"
                     >
                         ACESSAR ATELIÊ
                     </button>
-                    <p className="mt-8 text-[9px] text-white uppercase tracking-widest">Tecnologia Gemini 3 Pro</p>
+                    <p className="mt-8 text-[9px] text-[#7A7A7A] uppercase tracking-widest font-medium">Tecnologia Gemini 3 Pro</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0b] text-white font-sans pb-32">
+        <div className="min-h-screen bg-[#F6F5F2] text-[#2B2B2B] font-sans pb-32">
             <AppHeader onReset={handleGlobalReset} />
             
             <main className="max-w-7xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Controles */}
                 <div className="lg:col-span-4 space-y-6">
-                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl">
-                        <h2 className="text-xl font-bold text-[#D4AF37] mb-6 flex items-center gap-3 italic">
-                            1. Sua Foto
+                    <section className="bg-white p-8 rounded-[2.5rem] border border-[#E8E7E4] shadow-sm">
+                        <h2 className="text-lg font-bold text-[#2B2B2B] mb-6 flex items-center gap-3 italic uppercase tracking-widest">
+                            <span className="w-8 h-8 rounded-full bg-[#E8E7E4] flex items-center justify-center text-[12px] not-italic">01</span>
+                            Sua Foto
                         </h2>
                         <ImageUploader 
                             key={`client-${clientResetKey}`}
@@ -157,9 +157,10 @@ export default function App() {
                         />
                     </section>
 
-                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl">
-                        <h2 className="text-xl font-bold text-[#D4AF37] mb-6 flex items-center gap-3 italic">
-                            2. Peças
+                    <section className="bg-white p-8 rounded-[2.5rem] border border-[#E8E7E4] shadow-sm">
+                        <h2 className="text-lg font-bold text-[#2B2B2B] mb-6 flex items-center gap-3 italic uppercase tracking-widest">
+                            <span className="w-8 h-8 rounded-full bg-[#E8E7E4] flex items-center justify-center text-[12px] not-italic">02</span>
+                            Peças
                         </h2>
                         <div className="space-y-6">
                             <ImageUploader 
@@ -178,56 +179,55 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* BOTÃO EXECUTAR PROVA PRO - DOURADO CHAMPAGNE COM LETRAS BRANCAS */}
                         <button 
                             onClick={handleCreateLook}
                             disabled={isProcessing || !clientImage}
                             className={`
-                                w-full mt-8 py-5 text-lg font-black rounded-xl uppercase tracking-widest shadow-2xl transition-all active:scale-[0.98]
+                                w-full mt-10 py-5 text-lg font-black rounded-2xl uppercase tracking-widest shadow-lg transition-all active:scale-[0.98]
                                 ${isProcessing || !clientImage 
-                                    ? 'bg-[#3f3f46] text-[#71717a] cursor-not-allowed' 
-                                    : 'bg-[#D4AF37] text-white hover:bg-[#e5c05b] hover:shadow-[0_0_30px_rgba(212,175,55,0.4)]'}
+                                    ? 'bg-[#E8E7E4] text-[#7A7A7A] cursor-not-allowed' 
+                                    : 'bg-[#C6B8A6] text-white hover:bg-[#b5a896] hover:shadow-xl'}
                             `}
                         >
-                            {isProcessing ? 'GERANDO LOOK...' : 'EXECUTAR PROVA PRO'}
+                            {isProcessing ? 'PROCESSANDO...' : 'EXECUTAR PROVA PRO'}
                         </button>
                     </section>
                 </div>
 
                 {/* Resultado */}
                 <div className="lg:col-span-8 space-y-6">
-                    <section className="bg-[#161618] p-6 rounded-3xl border border-[#27272a] shadow-xl min-h-[650px] flex flex-col relative overflow-hidden">
-                        <div className="relative flex-grow bg-black/80 rounded-2xl overflow-hidden border border-[#27272a] flex items-center justify-center min-h-[550px]">
+                    <section className="bg-white p-8 rounded-[3rem] border border-[#E8E7E4] shadow-sm min-h-[650px] flex flex-col relative overflow-hidden">
+                        <div className="relative flex-grow bg-[#F6F5F2] rounded-[2rem] overflow-hidden border border-[#E8E7E4] flex items-center justify-center min-h-[550px]">
                             {isProcessing && <LoadingOverlay message={loadingMessage} />}
                             
                             {errorState === 'AUTH' && (
-                                <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
-                                    <h3 className="text-[#D4AF37] font-black mb-4 uppercase">Sessão Expirada</h3>
-                                    <button onClick={selectKey} className="bg-[#D4AF37] text-white px-8 py-3 rounded-lg font-black hover:bg-[#e5c05b]">REATIVAR ATELIÊ</button>
+                                <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-8 text-center">
+                                    <h3 className="text-[#2B2B2B] font-black mb-4 uppercase">Sessão Expirada</h3>
+                                    <button onClick={selectKey} className="bg-[#C6B8A6] text-white px-8 py-3 rounded-xl font-black hover:bg-[#b5a896]">REATIVAR ATELIÊ</button>
                                 </div>
                             )}
 
                             {errorState === 'QUOTA' && (
-                                <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
-                                    <h3 className="text-[#D4AF37] font-black mb-4 uppercase tracking-widest">Muitos Pedidos</h3>
-                                    <p className="text-xs text-white mb-8 max-w-[250px]">O Ateliê Pro está atendendo muitos convidados. Tente novamente em 60 segundos.</p>
-                                    <button onClick={handleCreateLook} className="bg-[#D4AF37] text-white px-8 py-3 rounded-lg font-black hover:bg-[#e5c05b]">TENTAR NOVAMENTE</button>
+                                <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-8 text-center">
+                                    <h3 className="text-[#C6B8A6] font-black mb-4 uppercase tracking-widest">Aguarde um instante</h3>
+                                    <p className="text-xs text-[#7A7A7A] mb-8 max-w-[250px]">O Ateliê está finalizando outros pedidos. Tente novamente em alguns segundos.</p>
+                                    <button onClick={handleCreateLook} className="bg-[#C6B8A6] text-white px-8 py-3 rounded-xl font-black hover:bg-[#b5a896]">TENTAR NOVAMENTE</button>
                                 </div>
                             )}
 
                             {generatedLook ? (
-                                <img src={generatedLook} alt="Look Final" className="max-w-full max-h-[800px] object-contain shadow-2xl animate-in fade-in duration-1000" />
+                                <img src={generatedLook} alt="Look Final" className="max-w-full max-h-[800px] object-contain shadow-sm animate-in fade-in zoom-in duration-1000" />
                             ) : !isProcessing && errorState === 'NONE' ? (
-                                <div className="text-center p-12 text-white/20">
-                                    <p className="font-black uppercase tracking-[0.5em] text-[12px]">SEU PROVADOR DIGITAL</p>
+                                <div className="text-center p-12 text-[#7A7A7A]/40">
+                                    <p className="font-black uppercase tracking-[0.5em] text-[10px]">VISUALIZAÇÃO DO LOOK</p>
                                 </div>
                             ) : null}
                         </div>
 
                         {generatedLook && errorState === 'NONE' && (
                             <div className="mt-8 grid grid-cols-2 gap-4">
-                                <button onClick={handleGlobalReset} className="py-4 bg-black border border-[#27272a] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-950/20">Novo Look</button>
-                                <a href={generatedLook} download="vofy-pro.jpg" className="bg-[#D4AF37] text-white py-4 text-center rounded-2xl font-black hover:bg-[#e5c05b]">EXPORTAR HD</a>
+                                <button onClick={handleGlobalReset} className="py-4 bg-[#F6F5F2] border border-[#E8E7E4] rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-white transition-colors">Nova Prova</button>
+                                <a href={generatedLook} download="vofy-pro.jpg" className="bg-[#C6B8A6] text-white py-4 text-center rounded-2xl font-black hover:bg-[#b5a896] transition-all shadow-md">SALVAR IMAGEM HD</a>
                             </div>
                         )}
                     </section>
