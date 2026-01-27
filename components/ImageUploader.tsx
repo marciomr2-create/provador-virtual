@@ -32,7 +32,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImage
 
     return (
         <div className="flex flex-col gap-2">
-            {label && <span className="text-[10px] font-black text-[#FDFBF7]/40 uppercase tracking-widest block text-center mb-1">{label}</span>}
+            {label && <span className="text-[10px] font-black text-white uppercase tracking-widest block text-center mb-1">{label}</span>}
             <div
                 onClick={() => inputRef.current?.click()}
                 onMouseEnter={() => setIsHovered(true)}
@@ -47,7 +47,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImage
                     <>
                         <img src={previewUrl} alt="Preview" className="w-full h-full object-cover animate-in fade-in duration-500" />
                         {isHovered && (
-                            <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-[10px] font-black text-[#FDFBF7] uppercase tracking-widest backdrop-blur-sm">
+                            <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-[10px] font-black text-white uppercase tracking-widest backdrop-blur-sm">
                                 Substituir Imagem
                             </div>
                         )}
@@ -57,7 +57,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, label, onImage
                         <div className="w-10 h-10 mb-3 bg-black/40 rounded-full flex items-center justify-center border border-[#27272a]">
                             <svg className="w-5 h-5 text-[#D4AF37]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path></svg>
                         </div>
-                        <span className="text-[9px] font-black text-[#FDFBF7]/30 uppercase tracking-widest leading-tight">{placeholderText}</span>
+                        <span className="text-[9px] font-black text-white uppercase tracking-widest leading-tight">{placeholderText}</span>
                     </div>
                 )}
             </div>

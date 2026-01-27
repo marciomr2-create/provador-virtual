@@ -23,9 +23,9 @@ const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
             <div className="flex flex-col">
                 <h1 className="text-4xl font-black text-[#D4AF37] tracking-tighter italic flex items-baseline">
                     VOFY
-                    <span className="text-[12px] font-normal not-italic lowercase tracking-normal ml-2 opacity-50">(mvp)</span>
+                    <span className="text-[12px] font-normal not-italic lowercase tracking-normal ml-2 text-white opacity-80">(mvp)</span>
                 </h1>
-                <span className="text-[10px] text-[#FDFBF7]/60 font-bold uppercase tracking-[0.3em] -mt-1">Provador Digital de Alta Performance</span>
+                <span className="text-[10px] text-white font-bold uppercase tracking-[0.3em] -mt-1">Provador Digital de Alta Performance</span>
             </div>
             <div className="flex gap-4 items-center">
                  <button 
@@ -117,26 +117,26 @@ export default function App() {
                 <div className="max-w-md w-full bg-[#161618] border border-[#D4AF37]/30 p-12 rounded-[2rem] shadow-2xl animate-in zoom-in duration-700">
                     <h1 className="text-5xl font-black text-[#D4AF37] italic mb-2 tracking-tighter flex items-baseline justify-center">
                         VOFY
-                        <span className="text-[14px] font-normal not-italic lowercase tracking-normal ml-3 opacity-40">(mvp)</span>
+                        <span className="text-[14px] font-normal not-italic lowercase tracking-normal ml-3 text-white opacity-80">(mvp)</span>
                     </h1>
-                    <p className="text-[#FDFBF7]/40 text-[10px] uppercase tracking-[0.4em] mb-12">Provador de Luxo</p>
-                    <p className="text-[#FDFBF7]/60 text-sm mb-12 leading-relaxed">
+                    <p className="text-white text-[10px] uppercase tracking-[0.4em] mb-12">Provador de Luxo</p>
+                    <p className="text-white text-sm mb-12 leading-relaxed">
                         Bem-vindo ao Ateliê. Para utilizar nosso motor de <span className="text-[#D4AF37]">Alta Fidelidade PRO</span>, clique no botão abaixo para autorizar o acesso.
                     </p>
                     <button 
                         onClick={selectKey}
-                        className="btn-primary w-full py-5 text-lg shadow-[0_0_50px_rgba(212,175,55,0.2)]"
+                        className="btn-primary w-full py-5 text-lg shadow-[0_0_50px_rgba(212,175,55,0.2)] text-white"
                     >
                         ACESSAR ATELIÊ
                     </button>
-                    <p className="mt-8 text-[9px] text-[#FDFBF7]/20 uppercase tracking-widest">Tecnologia Gemini 3 Pro</p>
+                    <p className="mt-8 text-[9px] text-white uppercase tracking-widest">Tecnologia Gemini 3 Pro</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0b] text-[#FDFBF7] font-sans pb-32">
+        <div className="min-h-screen bg-[#0a0a0b] text-white font-sans pb-32">
             <AppHeader onReset={handleGlobalReset} />
             
             <main className="max-w-7xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -181,7 +181,7 @@ export default function App() {
                         <button 
                             onClick={handleCreateLook}
                             disabled={isProcessing || !clientImage}
-                            className="w-full mt-8 btn-primary py-5 text-lg shadow-2xl group relative overflow-hidden"
+                            className="w-full mt-8 btn-primary py-5 text-lg shadow-2xl group relative overflow-hidden text-white"
                         >
                             <span className="relative z-10">{isProcessing ? 'GERANDO LOOK...' : 'EXECUTAR PROVA PRO'}</span>
                         </button>
@@ -197,23 +197,23 @@ export default function App() {
                             {errorState === 'AUTH' && (
                                 <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
                                     <h3 className="text-[#D4AF37] font-black mb-4 uppercase">Sessão Expirada</h3>
-                                    <button onClick={selectKey} className="btn-primary px-8 py-3">REATIVAR ATELIÊ</button>
+                                    <button onClick={selectKey} className="btn-primary px-8 py-3 text-white">REATIVAR ATELIÊ</button>
                                 </div>
                             )}
 
                             {errorState === 'QUOTA' && (
                                 <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
                                     <h3 className="text-[#D4AF37] font-black mb-4 uppercase tracking-widest">Muitos Pedidos</h3>
-                                    <p className="text-xs text-[#FDFBF7]/60 mb-8 max-w-[250px]">O Ateliê Pro está atendendo muitos convidados. Tente novamente em 60 segundos.</p>
-                                    <button onClick={handleCreateLook} className="btn-primary px-8 py-3">TENTAR NOVAMENTE</button>
+                                    <p className="text-xs text-white mb-8 max-w-[250px]">O Ateliê Pro está atendendo muitos convidados. Tente novamente em 60 segundos.</p>
+                                    <button onClick={handleCreateLook} className="btn-primary px-8 py-3 text-white">TENTAR NOVAMENTE</button>
                                 </div>
                             )}
 
                             {generatedLook ? (
                                 <img src={generatedLook} alt="Look Final" className="max-w-full max-h-[800px] object-contain shadow-2xl animate-in fade-in duration-1000" />
                             ) : !isProcessing && errorState === 'NONE' ? (
-                                <div className="text-center p-12 opacity-10">
-                                    <p className="font-black uppercase tracking-[0.5em] text-[12px]">Seu Ateliê Digital</p>
+                                <div className="text-center p-12 text-white/20">
+                                    <p className="font-black uppercase tracking-[0.5em] text-[12px]">SEU PROVADOR DIGITAL</p>
                                 </div>
                             ) : null}
                         </div>
@@ -221,7 +221,7 @@ export default function App() {
                         {generatedLook && errorState === 'NONE' && (
                             <div className="mt-8 grid grid-cols-2 gap-4">
                                 <button onClick={handleGlobalReset} className="py-4 bg-black border border-[#27272a] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-950/20">Novo Look</button>
-                                <a href={generatedLook} download="vofy-pro.jpg" className="btn-primary py-4 text-center rounded-2xl font-black">EXPORTAR HD</a>
+                                <a href={generatedLook} download="vofy-pro.jpg" className="btn-primary py-4 text-center rounded-2xl font-black text-white">EXPORTAR HD</a>
                             </div>
                         )}
                     </section>

@@ -13,7 +13,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({ outfits, onLoad, onD
         <div className="w-full">
             <h2 className="text-xl font-bold text-[#D4AF37] mb-6 flex items-center gap-3">
                 Acervo Pessoal
-                <span className="text-[10px] bg-[#161618] text-[#FDFBF7]/40 px-3 py-1 rounded-full border border-[#27272a]">{outfits.length} LOOKS</span>
+                <span className="text-[10px] bg-[#161618] text-white px-3 py-1 rounded-full border border-[#27272a]">{outfits.length} LOOKS</span>
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {outfits.map((outfit) => (
@@ -28,7 +28,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({ outfits, onLoad, onD
                             </button>
                             <button
                                 onClick={() => onDelete(outfit.id)}
-                                className="w-full bg-transparent hover:bg-red-950/40 text-[#FDFBF7]/40 hover:text-red-400 text-[9px] font-bold py-2 rounded uppercase tracking-widest border border-[#27272a] transition-all"
+                                className="w-full bg-transparent hover:bg-red-950/40 text-white hover:text-red-400 text-[9px] font-bold py-2 rounded uppercase tracking-widest border border-[#27272a] transition-all"
                             >
                                 Eliminar
                             </button>
