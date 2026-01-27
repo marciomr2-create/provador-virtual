@@ -85,7 +85,7 @@ export default function App() {
         
         setIsProcessing(true);
         setErrorState('NONE');
-        setLoadingMessage('Executando Costura Digital...');
+        setLoadingMessage('EXECUTANDO PROVA DIGITAL');
 
         try {
             const getB64 = async (img: ImageData | null) => {
@@ -125,7 +125,7 @@ export default function App() {
                     </p>
                     <button 
                         onClick={selectKey}
-                        className="btn-primary w-full py-5 text-lg shadow-[0_0_50px_rgba(212,175,55,0.2)] text-white"
+                        className="w-full py-5 text-lg rounded-xl font-black uppercase tracking-widest bg-[#D4AF37] text-white shadow-[0_0_50px_rgba(212,175,55,0.2)] hover:bg-[#e5c05b] transition-all"
                     >
                         ACESSAR ATELIÊ
                     </button>
@@ -173,17 +173,23 @@ export default function App() {
                             />
                             
                             <div className="grid grid-cols-2 gap-4">
-                                <ImageUploader id="top-up" label="SUP" placeholderText="Blusa" onImageUpload={(img) => { setFullBodyImage(null); setTopImage(img); }} previewUrl={topImage?.url} />
-                                <ImageUploader id="bot-up" label="INF" placeholderText="Calça" onImageUpload={(img) => { setFullBodyImage(null); setBottomImage(img); }} previewUrl={bottomImage?.url} />
+                                <ImageUploader id="top-up" label="VESTI SUPERIOR" placeholderText="Blusa" onImageUpload={(img) => { setFullBodyImage(null); setTopImage(img); }} previewUrl={topImage?.url} />
+                                <ImageUploader id="bot-up" label="VESTI INFERIOR" placeholderText="Calça" onImageUpload={(img) => { setFullBodyImage(null); setBottomImage(img); }} previewUrl={bottomImage?.url} />
                             </div>
                         </div>
 
+                        {/* BOTÃO EXECUTAR PROVA PRO - DOURADO CHAMPAGNE COM LETRAS BRANCAS */}
                         <button 
                             onClick={handleCreateLook}
                             disabled={isProcessing || !clientImage}
-                            className="w-full mt-8 btn-primary py-5 text-lg shadow-2xl group relative overflow-hidden text-white"
+                            className={`
+                                w-full mt-8 py-5 text-lg font-black rounded-xl uppercase tracking-widest shadow-2xl transition-all active:scale-[0.98]
+                                ${isProcessing || !clientImage 
+                                    ? 'bg-[#3f3f46] text-[#71717a] cursor-not-allowed' 
+                                    : 'bg-[#D4AF37] text-white hover:bg-[#e5c05b] hover:shadow-[0_0_30px_rgba(212,175,55,0.4)]'}
+                            `}
                         >
-                            <span className="relative z-10">{isProcessing ? 'GERANDO LOOK...' : 'EXECUTAR PROVA PRO'}</span>
+                            {isProcessing ? 'GERANDO LOOK...' : 'EXECUTAR PROVA PRO'}
                         </button>
                     </section>
                 </div>
@@ -197,7 +203,7 @@ export default function App() {
                             {errorState === 'AUTH' && (
                                 <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
                                     <h3 className="text-[#D4AF37] font-black mb-4 uppercase">Sessão Expirada</h3>
-                                    <button onClick={selectKey} className="btn-primary px-8 py-3 text-white">REATIVAR ATELIÊ</button>
+                                    <button onClick={selectKey} className="bg-[#D4AF37] text-white px-8 py-3 rounded-lg font-black hover:bg-[#e5c05b]">REATIVAR ATELIÊ</button>
                                 </div>
                             )}
 
@@ -205,7 +211,7 @@ export default function App() {
                                 <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8 text-center">
                                     <h3 className="text-[#D4AF37] font-black mb-4 uppercase tracking-widest">Muitos Pedidos</h3>
                                     <p className="text-xs text-white mb-8 max-w-[250px]">O Ateliê Pro está atendendo muitos convidados. Tente novamente em 60 segundos.</p>
-                                    <button onClick={handleCreateLook} className="btn-primary px-8 py-3 text-white">TENTAR NOVAMENTE</button>
+                                    <button onClick={handleCreateLook} className="bg-[#D4AF37] text-white px-8 py-3 rounded-lg font-black hover:bg-[#e5c05b]">TENTAR NOVAMENTE</button>
                                 </div>
                             )}
 
@@ -221,7 +227,7 @@ export default function App() {
                         {generatedLook && errorState === 'NONE' && (
                             <div className="mt-8 grid grid-cols-2 gap-4">
                                 <button onClick={handleGlobalReset} className="py-4 bg-black border border-[#27272a] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-950/20">Novo Look</button>
-                                <a href={generatedLook} download="vofy-pro.jpg" className="btn-primary py-4 text-center rounded-2xl font-black text-white">EXPORTAR HD</a>
+                                <a href={generatedLook} download="vofy-pro.jpg" className="bg-[#D4AF37] text-white py-4 text-center rounded-2xl font-black hover:bg-[#e5c05b]">EXPORTAR HD</a>
                             </div>
                         )}
                     </section>
