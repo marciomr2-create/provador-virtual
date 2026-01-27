@@ -150,7 +150,7 @@ export default function App() {
                             key={`client-${clientResetKey}`}
                             id="client-up" 
                             label="" 
-                            placeholderText="Foto Base" 
+                            placeholderText="FOTO BASE. FUNDO CLARO. ROUPAS SEM TONALIDADE DA PELE" 
                             onImageUpload={setClientImage} 
                             previewUrl={clientImage?.url} 
                             aspectRatio="portrait"
