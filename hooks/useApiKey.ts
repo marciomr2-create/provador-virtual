@@ -1,44 +1,35 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+const STORAGE_KEY = 'vofy_gemini_api_key';
+
 export const useApiKey = () => {
   const [isKeySelected, setIsKeySelected] = useState<boolean>(false);
   const [isCheckingKey, setIsCheckingKey] = useState<boolean>(true);
-
-  const checkKey = useCallback(async () => {
-    setIsCheckingKey(true);
-    try {
-      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setIsKeySelected(hasKey);
-      } else {
-        setIsKeySelected(false);
-      }
-    } catch (error) {
-      console.error("Error checking for API key:", error);
-      setIsKeySelected(false);
-    } finally {
-      setIsCheckingKey(false);
-    }
-  }, []);
+  const [apiKey, setApiKey] = useState<string | null>(null);
 
   useEffect(() => {
-    checkKey();
-  }, [checkKey]);
-
-  const selectKey = useCallback(async () => {
-    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-      await window.aistudio.openSelectKey();
-      // Assume success to avoid race condition and re-enable UI immediately
+    const savedKey = localStorage.getItem(STORAGE_KEY);
+    if (savedKey) {
+      setApiKey(savedKey);
       setIsKeySelected(true);
-    } else {
-      alert("API Key selection utility is not available.");
+    }
+    setIsCheckingKey(false);
+  }, []);
+
+  const selectKey = useCallback(async (manualKey?: string) => {
+    if (manualKey) {
+      localStorage.setItem(STORAGE_KEY, manualKey);
+      setApiKey(manualKey);
+      setIsKeySelected(true);
     }
   }, []);
   
   const resetKeySelection = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setApiKey(null);
     setIsKeySelected(false);
   }, []);
 
-  return { isKeySelected, isCheckingKey, selectKey, resetKeySelection };
+  return { isKeySelected, isCheckingKey, selectKey, resetKeySelection, apiKey };
 };

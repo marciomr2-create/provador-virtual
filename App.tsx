@@ -19,7 +19,7 @@ const LoadingOverlay: React.FC<{ message: string }> = ({ message }) => (
     </div>
 );
 
-const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
+const AppHeader: React.FC<{ onReset: () => void; onResetKey: () => void }> = ({ onReset, onResetKey }) => (
     <header className="bg-white/80 backdrop-blur-md border-b border-[#E8E7E4] p-6 sticky top-0 z-[100] shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col">
@@ -29,23 +29,33 @@ const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
                 </h1>
                 <span className="text-[9px] text-[#C6B8A6] font-bold uppercase tracking-[0.4em] -mt-1">Provador Digital de Alta Performance</span>
             </div>
-            <button 
-                onClick={onReset} 
-                className="flex items-center gap-2 px-8 py-3 bg-white hover:bg-[#F6F5F2] text-[#2B2B2B] border border-[#E8E7E4] rounded-full transition-all active:scale-95 shadow-sm group"
-            >
-                <svg className="w-3.5 h-3.5 text-[#C6B8A6] group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                </svg>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Limpar Provador</span>
-            </button>
+            <div className="flex items-center gap-4">
+                <button 
+                    onClick={onResetKey}
+                    className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#C6B8A6] hover:text-[#2B2B2B] transition-colors"
+                >
+                    Configurar Chave
+                </button>
+                <button 
+                    onClick={onReset} 
+                    className="flex items-center gap-2 px-8 py-3 bg-white hover:bg-[#F6F5F2] text-[#2B2B2B] border border-[#E8E7E4] rounded-full transition-all active:scale-95 shadow-sm group"
+                >
+                    <svg className="w-3.5 h-3.5 text-[#C6B8A6] group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Limpar Provador</span>
+                </button>
+            </div>
         </div>
     </header>
 );
 
 export default function App() {
-    const { isKeySelected, selectKey, resetKeySelection } = useApiKey();
+    const { isKeySelected, selectKey, resetKeySelection, apiKey } = useApiKey();
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [passcodeAttempt, setPasscodeAttempt] = useState("");
+    const [manualApiKey, setManualApiKey] = useState("");
+    
     const [clientImage, setClientImage] = useState<ImageData | null>(null);
     const [topImage, setTopImage] = useState<ImageData | null>(null);
     const [bottomImage, setBottomImage] = useState<ImageData | null>(null);
@@ -78,6 +88,7 @@ export default function App() {
     const handleCreateLook = async () => {
         if (!clientImage) return alert("Selecione sua foto base.");
         if (!fullBodyImage && !topImage && !bottomImage) return alert("Selecione pelo menos uma peça de roupa.");
+        if (!apiKey) return alert("Chave de API não configurada.");
         
         setIsProcessing(true); 
         setError(null);
@@ -94,7 +105,7 @@ export default function App() {
             const bottomB64 = await getB64(bottomImage);
             const fullBodyB64 = await getB64(fullBodyImage);
 
-            const resultB64 = await generateLook(personB64!, topB64, bottomB64, fullBodyB64);
+            const resultB64 = await generateLook(personB64!, topB64, bottomB64, fullBodyB64, apiKey);
             setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
         } catch (err: any) {
             console.error(err);
@@ -130,11 +141,28 @@ export default function App() {
             <div className="min-h-screen bg-[#F6F5F2] flex items-center justify-center p-6 text-center">
                 <div className="max-w-md w-full bg-white border border-[#E8E7E4] p-14 rounded-[3.5rem] shadow-2xl">
                     <div className="w-20 h-20 bg-[#F6F5F2] rounded-full flex items-center justify-center mx-auto mb-10 border border-[#E8E7E4]">
-                        <svg className="w-8 h-8 text-[#C6B8A6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m11 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <svg className="w-8 h-8 text-[#C6B8A6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
                     </div>
                     <h1 className="text-4xl font-black text-[#2B2B2B] italic mb-4 tracking-tighter">VOFY PRO</h1>
-                    <p className="text-[10px] text-[#7A7A7A] mb-12 font-bold uppercase tracking-[0.2em]">Ative sua chave de alta performance</p>
-                    <button onClick={selectKey} className="w-full py-6 text-[12px] tracking-[0.3em] rounded-2xl font-black bg-[#C6B8A6] text-white shadow-xl hover:bg-[#b5a896] transition-all">CONECTAR VOFY</button>
+                    <p className="text-[10px] text-[#7A7A7A] mb-12 font-bold uppercase tracking-[0.2em]">Insira sua chave de ativação Gemini</p>
+                    
+                    <div className="space-y-6">
+                        <input 
+                            type="text" 
+                            value={manualApiKey}
+                            onChange={(e) => setManualApiKey(e.target.value)}
+                            placeholder="SUA GEMINI API KEY"
+                            className="w-full bg-[#F6F5F2] border border-[#E8E7E4] rounded-2xl py-5 px-6 text-center text-[10px] font-bold tracking-[0.2em] focus:outline-none focus:border-[#C6B8A6] transition-colors"
+                        />
+                        <button 
+                            onClick={() => selectKey(manualApiKey)} 
+                            disabled={!manualApiKey}
+                            className="w-full py-6 text-[12px] tracking-[0.3em] rounded-2xl font-black bg-[#C6B8A6] text-white shadow-xl hover:bg-[#b5a896] transition-all disabled:opacity-50"
+                        >
+                            CONECTAR PROVADOR
+                        </button>
+                        <p className="text-[9px] text-[#C6B8A6] mt-4 font-bold">A chave será salva apenas localmente no seu navegador.</p>
+                    </div>
                 </div>
             </div>
         );
@@ -142,7 +170,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-[#F6F5F2] text-[#2B2B2B] font-sans pb-32">
-            <AppHeader onReset={handleGlobalReset} />
+            <AppHeader onReset={handleGlobalReset} onResetKey={resetKeySelection} />
             
             <main className="max-w-7xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
                 {/* Coluna de Uploads */}

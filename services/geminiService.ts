@@ -20,13 +20,12 @@ export const generateLook = async (
     personBase64: string, 
     topBase64: string | null, 
     bottomBase64: string | null,
-    fullBodyBase64: string | null
+    fullBodyBase64: string | null,
+    apiKey: string // Agora recebe a chave explicitamente
 ): Promise<string> => {
-    // Recriamos a instância para garantir o uso da chave mais recente selecionada
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     
     const parts: any[] = [];
-    // Ordem: Pessoa -> Roupas -> Prompt
     parts.push({ inlineData: { mimeType: 'image/jpeg', data: personBase64 } });
 
     if (fullBodyBase64) {
@@ -63,6 +62,9 @@ export const generateLook = async (
         if (imagePart?.inlineData) return imagePart.inlineData.data;
         throw new Error("A IA processou, mas não retornou uma imagem. Tente novamente.");
     } catch (err: any) {
+        if (err?.message?.includes('API_KEY_INVALID')) {
+            throw new Error("Chave de API Inválida. Verifique suas configurações.");
+        }
         throw new Error(err?.message || "Erro na comunicação com o motor Pro.");
     }
 };
