@@ -2,90 +2,85 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     fileToBase64, 
-    generateLook, 
-    resizeImageDataUrl 
+    generateLook
 } from './services/geminiService';
 import { useApiKey } from './hooks/useApiKey';
 import { ImageUploader } from './components/ImageUploader';
-import { HistoryPanel } from './components/HistoryPanel';
-import { ImageData, SavedOutfit } from './types';
+import { ImageData } from './types';
+
+const MASTER_PASSCODE = "OGUM";
 
 const LoadingOverlay: React.FC<{ message: string }> = ({ message }) => (
-    <div className="absolute inset-0 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center rounded-3xl z-50 px-6 text-center border border-[#C6B8A6]/20">
-        <div className="w-12 h-12 border-4 border-[#C6B8A6] border-t-transparent rounded-full animate-spin mb-6"></div>
-        <p className="text-[#2B2B2B] font-bold animate-pulse tracking-widest uppercase text-[10px] leading-relaxed max-w-[200px]">{message}</p>
+    <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center rounded-[2.5rem] z-50 px-6 text-center border border-[#C6B8A6]/10 shadow-2xl animate-in fade-in duration-500">
+        <div className="w-16 h-16 border-[3px] border-[#C6B8A6] border-t-transparent rounded-full animate-spin mb-8"></div>
+        <p className="text-[#2B2B2B] font-bold tracking-[0.4em] uppercase text-[10px] leading-relaxed max-w-[250px] animate-pulse">
+            {message}
+        </p>
     </div>
 );
 
 const AppHeader: React.FC<{ onReset: () => void }> = ({ onReset }) => (
-    <header className="bg-white border-b border-[#E8E7E4] p-6 sticky top-0 z-[100] shadow-sm">
+    <header className="bg-white/80 backdrop-blur-md border-b border-[#E8E7E4] p-6 sticky top-0 z-[100] shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col">
                 <h1 className="text-4xl font-black text-[#2B2B2B] tracking-tighter italic flex items-baseline">
                     VOFY
-                    <span className="text-[12px] font-normal not-italic lowercase tracking-normal ml-2 text-[#7A7A7A]">(mvp)</span>
+                    <span className="text-[12px] font-normal not-italic lowercase tracking-normal ml-2 text-[#C6B8A6]">pro</span>
                 </h1>
-                <span className="text-[10px] text-[#C6B8A6] font-bold uppercase tracking-[0.3em] -mt-1">Provador Digital de Alta Fidelidade</span>
+                <span className="text-[9px] text-[#C6B8A6] font-bold uppercase tracking-[0.4em] -mt-1">Provador Digital de Alta Performance</span>
             </div>
-            <div className="flex gap-4 items-center">
-                 <button 
-                    onClick={onReset}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-[#F6F5F2] hover:bg-[#E8E7E4] text-[#2B2B2B] border border-[#E8E7E4] rounded-full transition-all group active:scale-95"
-                 >
-                    <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    <span className="text-[11px] font-bold uppercase tracking-[0.15em]">LIMPAR</span>
-                 </button>
-            </div>
+            <button 
+                onClick={onReset} 
+                className="flex items-center gap-2 px-8 py-3 bg-white hover:bg-[#F6F5F2] text-[#2B2B2B] border border-[#E8E7E4] rounded-full transition-all active:scale-95 shadow-sm group"
+            >
+                <svg className="w-3.5 h-3.5 text-[#C6B8A6] group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Limpar Provador</span>
+            </button>
         </div>
     </header>
 );
 
 export default function App() {
-    const { isKeySelected, selectKey } = useApiKey();
+    const { isKeySelected, selectKey, resetKeySelection } = useApiKey();
+    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [passcodeAttempt, setPasscodeAttempt] = useState("");
     const [clientImage, setClientImage] = useState<ImageData | null>(null);
     const [topImage, setTopImage] = useState<ImageData | null>(null);
     const [bottomImage, setBottomImage] = useState<ImageData | null>(null);
     const [fullBodyImage, setFullBodyImage] = useState<ImageData | null>(null);
-    
-    const [clothingResetKey, setClothingResetKey] = useState(0);
-    const [clientResetKey, setClientResetKey] = useState(0);
-    
     const [generatedLook, setGeneratedLook] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [errorState, setErrorState] = useState<'NONE' | 'QUOTA' | 'AUTH' | 'GENERIC'>('NONE');
-    const [loadingMessage, setLoadingMessage] = useState('');
-    const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const stored = localStorage.getItem('vofy_history_v1');
-        if (stored) setSavedOutfits(JSON.parse(stored));
+        const storedAuth = localStorage.getItem('vofy_authorized_v2');
+        if (storedAuth === 'true') setIsAuthorized(true);
     }, []);
 
-    useEffect(() => {
-        localStorage.setItem('vofy_history_v1', JSON.stringify(savedOutfits));
-    }, [savedOutfits]);
+    const handlePasscodeSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (passcodeAttempt === MASTER_PASSCODE) {
+            setIsAuthorized(true);
+            localStorage.setItem('vofy_authorized_v2', 'true');
+        } else {
+            setPasscodeAttempt("");
+            alert("Acesso Negado.");
+        }
+    };
 
     const handleGlobalReset = useCallback(() => {
-        setClientImage(null);
-        setTopImage(null);
-        setBottomImage(null);
-        setFullBodyImage(null);
-        setGeneratedLook(null);
-        setErrorState('NONE');
-        setClientResetKey(k => k + 1);
-        setClothingResetKey(k => k + 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setClientImage(null); setTopImage(null); setBottomImage(null); setFullBodyImage(null); setGeneratedLook(null);
+        setError(null);
     }, []);
 
     const handleCreateLook = async () => {
-        if (!clientImage || (!topImage && !bottomImage && !fullBodyImage)) {
-            alert("Selecione sua foto base e as roupas.");
-            return;
-        }
+        if (!clientImage) return alert("Selecione sua foto base.");
+        if (!fullBodyImage && !topImage && !bottomImage) return alert("Selecione pelo menos uma peça de roupa.");
         
-        setIsProcessing(true);
-        setErrorState('NONE');
-        setLoadingMessage('EXECUTANDO PROVA DIGITAL');
+        setIsProcessing(true); 
+        setError(null);
 
         try {
             const getB64 = async (img: ImageData | null) => {
@@ -101,34 +96,45 @@ export default function App() {
 
             const resultB64 = await generateLook(personB64!, topB64, bottomB64, fullBodyB64);
             setGeneratedLook(`data:image/jpeg;base64,${resultB64}`);
-        } catch (error: any) {
-            if (error.message === 'QUOTA_EXCEEDED') setErrorState('QUOTA');
-            else if (error.message === 'AUTH_REQUIRED') setErrorState('AUTH');
-            else setErrorState('GENERIC');
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || "Ocorreu um erro no processamento. Verifique sua conexão.");
         } finally {
             setIsProcessing(false);
         }
     };
 
+    if (!isAuthorized) {
+        return (
+            <div className="min-h-screen bg-[#F6F5F2] flex items-center justify-center p-6">
+                <div className="max-w-sm w-full bg-white border border-[#E8E7E4] p-12 rounded-[3rem] shadow-2xl text-center">
+                    <h1 className="text-5xl font-black text-[#2B2B2B] italic mb-10 tracking-tighter">VOFY</h1>
+                    <form onSubmit={handlePasscodeSubmit} className="space-y-6">
+                        <input 
+                            type="password" 
+                            autoFocus
+                            value={passcodeAttempt} 
+                            onChange={(e) => setPasscodeAttempt(e.target.value)} 
+                            placeholder="SENHA VOFY PRO" 
+                            className="w-full bg-[#F6F5F2] border border-[#E8E7E4] rounded-2xl py-5 px-6 text-center text-[10px] font-bold tracking-[0.3em] focus:outline-none focus:border-[#C6B8A6] transition-colors"
+                        />
+                        <button type="submit" className="w-full py-5 rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] bg-[#2B2B2B] text-white hover:bg-black transition-all shadow-lg active:scale-95">Acessar</button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
     if (!isKeySelected) {
         return (
             <div className="min-h-screen bg-[#F6F5F2] flex items-center justify-center p-6 text-center">
-                <div className="max-w-md w-full bg-white border border-[#E8E7E4] p-12 rounded-[2.5rem] shadow-xl animate-in zoom-in duration-700">
-                    <h1 className="text-5xl font-black text-[#2B2B2B] italic mb-2 tracking-tighter flex items-baseline justify-center">
-                        VOFY
-                        <span className="text-[14px] font-normal not-italic lowercase tracking-normal ml-3 text-[#7A7A7A] opacity-80">(mvp)</span>
-                    </h1>
-                    <p className="text-[#C6B8A6] text-[10px] uppercase tracking-[0.4em] mb-12 font-bold">Provador Digital Pro</p>
-                    <p className="text-[#7A7A7A] text-sm mb-12 leading-relaxed">
-                        Bem-vindo ao Ateliê Digital. Para utilizar nosso motor de <span className="text-[#2B2B2B] font-bold">Alta Fidelidade PRO</span>, clique abaixo para autorizar o acesso.
-                    </p>
-                    <button 
-                        onClick={selectKey}
-                        className="w-full py-5 text-lg rounded-2xl font-black uppercase tracking-widest bg-[#C6B8A6] text-white shadow-lg hover:bg-[#b5a896] transition-all"
-                    >
-                        ACESSAR ATELIÊ
-                    </button>
-                    <p className="mt-8 text-[9px] text-[#7A7A7A] uppercase tracking-widest font-medium">Tecnologia Gemini 3 Pro</p>
+                <div className="max-w-md w-full bg-white border border-[#E8E7E4] p-14 rounded-[3.5rem] shadow-2xl">
+                    <div className="w-20 h-20 bg-[#F6F5F2] rounded-full flex items-center justify-center mx-auto mb-10 border border-[#E8E7E4]">
+                        <svg className="w-8 h-8 text-[#C6B8A6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m11 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h1 className="text-4xl font-black text-[#2B2B2B] italic mb-4 tracking-tighter">VOFY PRO</h1>
+                    <p className="text-[10px] text-[#7A7A7A] mb-12 font-bold uppercase tracking-[0.2em]">Ative sua chave de alta performance</p>
+                    <button onClick={selectKey} className="w-full py-6 text-[12px] tracking-[0.3em] rounded-2xl font-black bg-[#C6B8A6] text-white shadow-xl hover:bg-[#b5a896] transition-all">CONECTAR VOFY</button>
                 </div>
             </div>
         );
@@ -138,98 +144,69 @@ export default function App() {
         <div className="min-h-screen bg-[#F6F5F2] text-[#2B2B2B] font-sans pb-32">
             <AppHeader onReset={handleGlobalReset} />
             
-            <main className="max-w-7xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Controles */}
-                <div className="lg:col-span-4 space-y-6">
-                    <section className="bg-white p-8 rounded-[2.5rem] border border-[#E8E7E4] shadow-sm">
-                        <h2 className="text-lg font-bold text-[#2B2B2B] mb-6 flex items-center gap-3 italic uppercase tracking-widest">
-                            <span className="w-8 h-8 rounded-full bg-[#E8E7E4] flex items-center justify-center text-[12px] not-italic">01</span>
-                            Sua Foto
-                        </h2>
-                        <ImageUploader 
-                            key={`client-${clientResetKey}`}
-                            id="client-up" 
-                            label="" 
-                            placeholderText="FOTO BASE. FUNDO CLARO. ROUPAS SEM TONALIDADE DA PELE" 
-                            onImageUpload={setClientImage} 
-                            previewUrl={clientImage?.url} 
-                            aspectRatio="portrait"
-                        />
+            <main className="max-w-7xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
+                {/* Coluna de Uploads */}
+                <div className="lg:col-span-4 space-y-8">
+                    <section className="bg-white p-8 rounded-[3rem] border border-[#E8E7E4] shadow-sm">
+                        <div className="flex items-center justify-between mb-8">
+                            <h2 className="text-xs font-black italic uppercase tracking-[0.3em] text-[#C6B8A6]">01. Modelo Base</h2>
+                            <div className="w-2 h-2 rounded-full bg-[#C6B8A6]"></div>
+                        </div>
+                        <ImageUploader id="client-up" label="" placeholderText="Sua Foto de Corpo Inteiro" onImageUpload={setClientImage} previewUrl={clientImage?.url} aspectRatio="portrait" />
                     </section>
 
-                    <section className="bg-white p-8 rounded-[2.5rem] border border-[#E8E7E4] shadow-sm">
-                        <h2 className="text-lg font-bold text-[#2B2B2B] mb-6 flex items-center gap-3 italic uppercase tracking-widest">
-                            <span className="w-8 h-8 rounded-full bg-[#E8E7E4] flex items-center justify-center text-[12px] not-italic">02</span>
-                            Peças
-                        </h2>
-                        <div className="space-y-6">
-                            <ImageUploader 
-                                key={`full-${clothingResetKey}`}
-                                id="full-up" 
-                                label="VESTIDO / MACACÃO" 
-                                placeholderText="Peça Única" 
-                                onImageUpload={(img) => { setTopImage(null); setBottomImage(null); setFullBodyImage(img); }} 
-                                previewUrl={fullBodyImage?.url}
-                                aspectRatio="portrait"
-                            />
-                            
+                    <section className="bg-white p-8 rounded-[3rem] border border-[#E8E7E4] shadow-sm">
+                        <div className="flex items-center justify-between mb-8">
+                            <h2 className="text-xs font-black italic uppercase tracking-[0.3em] text-[#C6B8A6]">02. Seleção de Peças</h2>
+                            <div className="w-2 h-2 rounded-full bg-[#C6B8A6]"></div>
+                        </div>
+                        <div className="space-y-8">
+                            <ImageUploader id="full-up" label="LOOK COMPLETO" placeholderText="Vestido ou Macacão" onImageUpload={(img) => { setTopImage(null); setBottomImage(null); setFullBodyImage(img); }} previewUrl={fullBodyImage?.url} aspectRatio="portrait" />
                             <div className="grid grid-cols-2 gap-4">
-                                <ImageUploader id="top-up" label="VESTI SUPERIOR" placeholderText="Blusa" onImageUpload={(img) => { setFullBodyImage(null); setTopImage(img); }} previewUrl={topImage?.url} />
-                                <ImageUploader id="bot-up" label="VESTI INFERIOR" placeholderText="Calça" onImageUpload={(img) => { setFullBodyImage(null); setBottomImage(img); }} previewUrl={bottomImage?.url} />
+                                <ImageUploader id="top-up" label="PARTE SUPERIOR" placeholderText="Blusa / Casaco" onImageUpload={(img) => { setFullBodyImage(null); setTopImage(img); }} previewUrl={topImage?.url} />
+                                <ImageUploader id="bot-up" label="PARTE INFERIOR" placeholderText="Calça / Saia" onImageUpload={(img) => { setFullBodyImage(null); setBottomImage(img); }} previewUrl={bottomImage?.url} />
                             </div>
                         </div>
-
+                        
                         <button 
-                            onClick={handleCreateLook}
-                            disabled={isProcessing || !clientImage}
-                            className={`
-                                w-full mt-10 py-5 text-lg font-black rounded-2xl uppercase tracking-widest shadow-lg transition-all active:scale-[0.98]
-                                ${isProcessing || !clientImage 
-                                    ? 'bg-[#E8E7E4] text-[#7A7A7A] cursor-not-allowed' 
-                                    : 'bg-[#C6B8A6] text-white hover:bg-[#b5a896] hover:shadow-xl'}
-                            `}
+                            onClick={handleCreateLook} 
+                            disabled={isProcessing} 
+                            className="w-full mt-12 py-6 text-[11px] font-black tracking-[0.3em] rounded-2xl bg-[#2B2B2B] text-white shadow-xl hover:bg-black disabled:bg-[#E8E7E4] transition-all active:scale-95 uppercase"
                         >
-                            {isProcessing ? 'PROCESSANDO...' : 'EXECUTAR PROVA PRO'}
+                            {isProcessing ? 'Processando Tecidos...' : 'Executar Prova Real'}
                         </button>
                     </section>
                 </div>
 
-                {/* Resultado */}
-                <div className="lg:col-span-8 space-y-6">
-                    <section className="bg-white p-8 rounded-[3rem] border border-[#E8E7E4] shadow-sm min-h-[650px] flex flex-col relative overflow-hidden">
-                        <div className="relative flex-grow bg-[#F6F5F2] rounded-[2rem] overflow-hidden border border-[#E8E7E4] flex items-center justify-center min-h-[550px]">
-                            {isProcessing && <LoadingOverlay message={loadingMessage} />}
+                {/* Coluna de Resultado */}
+                <div className="lg:col-span-8">
+                    <section className="bg-white p-4 rounded-[3.5rem] border border-[#E8E7E4] shadow-sm min-h-[700px] flex flex-col relative overflow-hidden">
+                        <div className="relative flex-grow bg-[#F6F5F2] rounded-[2.5rem] overflow-hidden border border-[#E8E7E4] flex items-center justify-center min-h-[660px]">
+                            {isProcessing && <LoadingOverlay message="Renderizando alta fidelidade..." />}
                             
-                            {errorState === 'AUTH' && (
-                                <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-8 text-center">
-                                    <h3 className="text-[#2B2B2B] font-black mb-4 uppercase">Sessão Expirada</h3>
-                                    <button onClick={selectKey} className="bg-[#C6B8A6] text-white px-8 py-3 rounded-xl font-black hover:bg-[#b5a896]">REATIVAR ATELIÊ</button>
-                                </div>
-                            )}
-
-                            {errorState === 'QUOTA' && (
-                                <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-8 text-center">
-                                    <h3 className="text-[#C6B8A6] font-black mb-4 uppercase tracking-widest">Aguarde um instante</h3>
-                                    <p className="text-xs text-[#7A7A7A] mb-8 max-w-[250px]">O Ateliê está finalizando outros pedidos. Tente novamente em alguns segundos.</p>
-                                    <button onClick={handleCreateLook} className="bg-[#C6B8A6] text-white px-8 py-3 rounded-xl font-black hover:bg-[#b5a896]">TENTAR NOVAMENTE</button>
+                            {error && (
+                                <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
+                                    <div className="w-16 h-16 bg-red-50 text-red-400 rounded-full flex items-center justify-center mb-6">
+                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                    </div>
+                                    <h3 className="text-lg font-black mb-4 uppercase tracking-tighter">Ops! Algo deu errado.</h3>
+                                    <p className="text-[11px] text-[#7A7A7A] mb-10 max-w-xs font-medium leading-relaxed">{error}</p>
+                                    <button onClick={handleCreateLook} className="bg-[#2B2B2B] text-white px-12 py-4 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-black transition-all">Tentar Novamente</button>
                                 </div>
                             )}
 
                             {generatedLook ? (
-                                <img src={generatedLook} alt="Look Final" className="max-w-full max-h-[800px] object-contain shadow-sm animate-in fade-in zoom-in duration-1000" />
-                            ) : !isProcessing && errorState === 'NONE' ? (
-                                <div className="text-center p-12 text-[#7A7A7A]/40">
-                                    <p className="font-black uppercase tracking-[0.5em] text-[10px]">VISUALIZAÇÃO DO LOOK</p>
+                                <div className="w-full h-full p-4 flex items-center justify-center animate-in fade-in zoom-in duration-700">
+                                    <img src={generatedLook} alt="Look Final" className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
+                                </div>
+                            ) : !isProcessing && !error ? (
+                                <div className="flex flex-col items-center gap-4 opacity-20">
+                                    <div className="w-20 h-px bg-[#C6B8A6]"></div>
+                                    <p className="font-black uppercase tracking-[0.6em] text-[10px] text-[#2B2B2B]">Provador Digital</p>
+                                    <div className="w-20 h-px bg-[#C6B8A6]"></div>
                                 </div>
                             ) : null}
                         </div>
-
-                        {generatedLook && errorState === 'NONE' && (
-                            <div className="mt-8 grid grid-cols-2 gap-4">
-                                <button onClick={handleGlobalReset} className="py-4 bg-[#F6F5F2] border border-[#E8E7E4] rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-white transition-colors">Nova Prova</button>
-                                <a href={generatedLook} download="vofy-pro.jpg" className="bg-[#C6B8A6] text-white py-4 text-center rounded-2xl font-black hover:bg-[#b5a896] transition-all shadow-md">SALVAR IMAGEM HD</a>
-                            </div>
-                        )}
                     </section>
                 </div>
             </main>
