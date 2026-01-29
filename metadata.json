@@ -1,5 +1,7 @@
 {
-  "name": "VOFY (MVP) - Provador Digital de Alta Performance",
-  "description": "Provador virtual de luxo movido a Inteligência Artificial. Experimente looks com fidelidade real em segundos.",
-  "requestFramePermissions": []
+  "name": "VOFY PRO - Provador Digital AI",
+  "description": "Provador virtual de luxo movido a Inteligência Artificial. Experiência de alta fidelidade em segundos.",
+  "requestFramePermissions": [
+    "camera"
+  ]
 }
